@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USC Class Schedule Generator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+
+  <header>
+    <div class="header-text">
+      <h1>USC Class Schedule Generator</h1>
+      <p>Enter member schedules and export Monday–Saturday PDFs.</p>
+    </div>
+    <div class="header-group-field">
+      <span>Learner Group</span>
+      <input id="learner-group" type="text" />
+    </div>
+    <div class="header-group-field">
+      <span>Upload Learner Group Logo <span style="font-weight:400;text-transform:none;">(optional)</span></span>
+      <label class="logo-upload-label" for="lg-logo-input">
+        <span id="logo-upload-text">Choose image…</span>
+        <input id="lg-logo-input" type="file" accept="image/*" style="display:none;" />
+      </label>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button id="add-member" type="button">+ Add Member</button>
+    <!-- Download group -->
+    <div class="dl-group">
+      <select id="dl-day-select">
+        <option value="ALL">All 6 Days (one PDF)</option>
+        <option value="Monday">Monday</option>
+        <option value="Tuesday">Tuesday</option>
+        <option value="Wednesday">Wednesday</option>
+        <option value="Thursday">Thursday</option>
+        <option value="Friday">Friday</option>
+        <option value="Saturday">Saturday</option>
+      </select>
+      <button id="generate-pdfs" type="button">⬇ Download PDF</button>
+<button id="save-project" type="button" class="has-tip" data-tip="Save your schedule to a .txt file so you can reload it later.">💾 Save Schedule</button>
+<button id="load-project" type="button" class="has-tip" data-tip="Load a previously saved .txt schedule file to continue editing.">📂 Load Schedule</button>
+<input id="load-project-file" type="file" accept=".txt,.json" style="display:none;">
+    </div>
+  </div>
+
+  <div class="section-title">Members</div>
+  <div id="members"></div>
+
+  <div class="section-title" style="margin-top:1.25rem;">Preview</div>
+  <div class="preview-controls">
+    <label for="preview-day">Day <select id="preview-day"></select></label>
+  </div>
+  <div id="timeline-preview"></div>
+
+</main>
+
+<template id="member-template">
+  <article class="member-card">
+    <div class="member-header">
+      <input class="member-name-input" type="text" placeholder="Member Name" />
+      <input class="dept-input" type="text" placeholder="Dept" />
+      <input class="position-input" type="text" placeholder="Position (optional)" />
+      <div class="color-swatch">
+        <input class="member-color" type="color" value="#888888" title="Bar color" />
+        <span>Color</span>
+      </div>
+      <button class="remove-member" type="button">Remove member</button>
+    </div>
+    <div class="classes"></div>
+    <button class="add-class-btn" type="button">+ Add Class</button>
+  </article>
+</template>
+
+<template id="class-template">
+  <div class="class-entry">
+    <label>Day<select class="day"></select></label>
+    <label>Course Code<input class="course-code" type="text" /></label>
+    <label>Start<input class="start-time" type="time" min="07:00" max="21:00" step="900" /></label>
+    <label>End<input class="end-time" type="time" min="07:15" max="21:00" step="900" /></label>
+    <label>Room<input class="room" type="text" /></label>
+    <button class="remove-class" type="button">Remove class</button>
+  </div>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
