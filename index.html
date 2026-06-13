@@ -1,965 +1,1025 @@
-  <!doctype html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Group Class Schedule Generator</title>
-    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-    <style>
-      :root {
-        --bg:           #f0f0f0;
-        --surface:      #ffffff;
-        --surface2:     #f7f7f7;
-        --border:       #d0d0d0;
-        --border-light: #e0e0e0;
-        --accent:       #555555;
-        --accent-hover: #333333;
-        --danger:       #cc3333;
-        --text:         #1a1a1a;
-        --text-muted:   #555555;
-        --text-dim:     #999999;
-        --input-bg:     #ffffff;
-        --input-border: #c0c0c0;
-        --input-focus:  #888888;
-        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-        color-scheme: light;
-      }
-      *, *::before, *::after { box-sizing: border-box; }
-      body { margin:0; background:var(--bg); color:var(--text); min-height:100vh; }
-      main { max-width:1360px; margin:0 auto; padding:1.25rem 1rem 3rem; }
-      h1,h2,h3,p { margin:0; }
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Group Class Schedule Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:           #f0f0f0;
+      --surface:      #ffffff;
+      --surface2:     #f7f7f7;
+      --border:       #d0d0d0;
+      --border-light: #e0e0e0;
+      --accent:       #555555;
+      --accent-hover: #333333;
+      --danger:       #cc3333;
+      --text:         #1a1a1a;
+      --text-muted:   #555555;
+      --text-dim:     #999999;
+      --input-bg:     #ffffff;
+      --input-border: #c0c0c0;
+      --input-focus:  #888888;
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      color-scheme: light;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); min-height:100vh; }
+    main { max-width:1360px; margin:0 auto; padding:1.25rem 1rem 3rem; }
+    h1,h2,h3,p { margin:0; }
 
-      /* HEADER */
-      header {
-        background:var(--surface); border:1px solid var(--border); border-radius:10px;
-        padding:1rem 1.25rem; margin-bottom:1rem;
-        display:flex; flex-wrap:wrap; align-items:center; gap:1rem;
-      }
-      .header-text { flex:1 1 260px; }
-      header h1 { font-size:1.2rem; font-weight:700; }
-      header p  { font-size:0.8rem; color:var(--text-muted); margin-top:0.15rem; }
-      .header-group-field { display:flex; flex-direction:column; gap:0.25rem; flex:0 0 220px; }
-      .header-group-field > span {
-        font-size:0.72rem; font-weight:600; color:var(--text-muted);
-        text-transform:uppercase; letter-spacing:0.05em;
-      }
-      #learner-group {
-        background:var(--input-bg); border:1px solid var(--input-border); border-radius:7px;
-        padding:0.45rem 0.65rem; font:inherit; font-size:0.88rem; color:var(--text);
-        transition:border-color 0.15s;
-      }
-      #learner-group:focus { outline:none; border-color:var(--input-focus); }
+    /* HEADER */
+    header {
+      background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      padding:1rem 1.25rem; margin-bottom:1rem;
+      display:flex; flex-wrap:wrap; align-items:center; gap:1rem;
+    }
+    .header-text { flex:1 1 260px; }
+    header h1 { font-size:1.2rem; font-weight:700; }
+    header p  { font-size:0.8rem; color:var(--text-muted); margin-top:0.15rem; }
+    .header-group-field { display:flex; flex-direction:column; gap:0.25rem; flex:0 0 220px; }
+    .header-group-field > span {
+      font-size:0.72rem; font-weight:600; color:var(--text-muted);
+      text-transform:uppercase; letter-spacing:0.05em;
+    }
+    #learner-group {
+      background:var(--input-bg); border:1px solid var(--input-border); border-radius:7px;
+      padding:0.45rem 0.65rem; font:inherit; font-size:0.88rem; color:var(--text);
+      transition:border-color 0.15s;
+    }
+    #learner-group:focus { outline:none; border-color:var(--input-focus); }
 
-      /* CONTROLS */
-      .controls { display:flex; gap:0.6rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center; }
-      button {
-        border:1px solid var(--accent); border-radius:7px; padding:0.45rem 0.9rem;
-        background:var(--accent); color:#fff; cursor:pointer; font:inherit;
-        font-size:0.85rem; font-weight:600; transition:background 0.15s;
-      }
-      button:hover  { background:var(--accent-hover); border-color:var(--accent-hover); }
-      button:active { opacity:0.85; }
-      button.remove-member, button.remove-class {
-        background:transparent; border:1px solid var(--danger); color:var(--danger);
-        font-size:0.78rem; padding:0.3rem 0.6rem;
-      }
-      button.remove-member:hover, button.remove-class:hover { background:var(--danger); color:#fff; }
-      button.add-class-btn {
-        background:transparent; border:1px dashed var(--border);
-        color:var(--text-muted); font-size:0.8rem; font-weight:500;
-      }
-      button.add-class-btn:hover { border-color:var(--accent); color:var(--accent); background:transparent; }
+    /* CONTROLS */
+    .controls { display:flex; gap:0.6rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center; }
+    button {
+      border:1px solid var(--accent); border-radius:7px; padding:0.45rem 0.9rem;
+      background:var(--accent); color:#fff; cursor:pointer; font:inherit;
+      font-size:0.85rem; font-weight:600; transition:background 0.15s;
+    }
+    button:hover  { background:var(--accent-hover); border-color:var(--accent-hover); }
+    button:active { opacity:0.85; }
+    button.remove-member, button.remove-class {
+      background:transparent; border:1px solid var(--danger); color:var(--danger);
+      font-size:0.78rem; padding:0.3rem 0.6rem;
+    }
+    button.remove-member:hover, button.remove-class:hover { background:var(--danger); color:#fff; }
+    button.duplicate-member, button.duplicate-class {
+      background:transparent; border:1px solid var(--border);
+      color:var(--text-muted); font-size:0.78rem; padding:0.3rem 0.6rem;
+    }
+    button.duplicate-member:hover, button.duplicate-class:hover {
+      border-color:var(--accent); color:var(--accent); background:transparent;
+    }
+    button.add-class-btn {
+      background:transparent; border:1px dashed var(--border);
+      color:var(--text-muted); font-size:0.8rem; font-weight:500;
+    }
+    button.add-class-btn:hover { border-color:var(--accent); color:var(--accent); background:transparent; }
 
-      /* Save/Load tooltip via title — enhance with custom tooltip */
-      .has-tip { position:relative; }
-      .has-tip::after {
-        content: attr(data-tip);
-        position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
-        background:#222; color:#fff; font-size:0.7rem; font-weight:400;
-        padding:0.3rem 0.55rem; border-radius:5px; white-space:nowrap;
-        pointer-events:none; opacity:0; transition:opacity 0.15s;
-        z-index:100; line-height:1.4;
-      }
-      .has-tip::before {
-        content:''; position:absolute; bottom:calc(100% + 1px); left:50%; transform:translateX(-50%);
-        border:4px solid transparent; border-top-color:#222;
-        pointer-events:none; opacity:0; transition:opacity 0.15s; z-index:100;
-      }
-      .has-tip:hover::after, .has-tip:hover::before { opacity:1; }
+    /* Save/Load tooltip via title — enhance with custom tooltip */
+    .has-tip { position:relative; }
+    .has-tip::after {
+      content: attr(data-tip);
+      position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+      background:#222; color:#fff; font-size:0.7rem; font-weight:400;
+      padding:0.3rem 0.55rem; border-radius:5px; white-space:nowrap;
+      pointer-events:none; opacity:0; transition:opacity 0.15s;
+      z-index:100; line-height:1.4;
+    }
+    .has-tip::before {
+      content:''; position:absolute; bottom:calc(100% + 1px); left:50%; transform:translateX(-50%);
+      border:4px solid transparent; border-top-color:#222;
+      pointer-events:none; opacity:0; transition:opacity 0.15s; z-index:100;
+    }
+    .has-tip:hover::after, .has-tip:hover::before { opacity:1; }
 
-      /* Download controls inline */
-      .dl-group {
-        display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;
-      }
-      .dl-group select {
-        background:var(--input-bg); border:1px solid var(--input-border); border-radius:7px;
-        padding:0.42rem 0.6rem; font:inherit; font-size:0.85rem; color:var(--text);
-        cursor:pointer; transition:border-color 0.15s;
-      }
-      .dl-group select:focus { outline:none; border-color:var(--input-focus); }
+    /* Download controls inline */
+    .dl-group {
+      display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;
+    }
+    .dl-group select {
+      background:var(--input-bg); border:1px solid var(--input-border); border-radius:7px;
+      padding:0.42rem 0.6rem; font:inherit; font-size:0.85rem; color:var(--text);
+      cursor:pointer; transition:border-color 0.15s;
+    }
+    .dl-group select:focus { outline:none; border-color:var(--input-focus); }
 
-      /* SECTION TITLES */
-      .section-title {
-        font-size:0.72rem; font-weight:700; color:var(--text-muted);
-        text-transform:uppercase; letter-spacing:0.08em;
-        margin-bottom:0.65rem; padding-bottom:0.4rem; border-bottom:1px solid var(--border);
-      }
+    /* SECTION TITLES */
+    .section-title {
+      font-size:0.72rem; font-weight:700; color:var(--text-muted);
+      text-transform:uppercase; letter-spacing:0.08em;
+      margin-bottom:0.65rem; padding-bottom:0.4rem; border-bottom:1px solid var(--border);
+    }
 
-      /* MEMBERS */
-      #members { display:grid; gap:0.75rem; }
-      .member-card {
-        background:var(--surface); border-radius:10px;
-        padding:0.9rem 1.1rem; border:1px solid var(--border);
-      }
-      .member-header {
-        display:flex; align-items:center; gap:0.5rem; margin-bottom:0.7rem; flex-wrap:wrap;
-      }
-      .member-name-input {
-        background:transparent; border:none; border-bottom:1px dashed var(--border);
-        color:var(--text); font:inherit; font-size:0.97rem; font-weight:700;
-        padding:0.1rem 0.25rem; flex:1 1 160px; min-width:120px; max-width:240px;
-        transition:border-color 0.15s;
-      }
-      .member-name-input:focus { outline:none; border-bottom-color:var(--input-focus); }
-      .member-name-input::placeholder { color:var(--text-dim); font-weight:400; }
-      .dept-input {
-        background:var(--input-bg); border:1px solid var(--input-border); border-radius:6px;
-        padding:0.3rem 0.5rem; font:inherit; font-size:0.82rem; color:var(--text);
-        width:90px; flex-shrink:0; transition:border-color 0.15s;
-      }
-      .dept-input:focus { outline:none; border-color:var(--input-focus); }
-      .dept-input::placeholder { color:var(--text-dim); }
-      .position-input {
-        background:var(--input-bg); border:1px solid var(--input-border); border-radius:6px;
-        padding:0.3rem 0.5rem; font:inherit; font-size:0.82rem; font-style:italic;
-        color:var(--text-muted); flex:1 1 120px; min-width:100px; max-width:180px;
-        transition:border-color 0.15s;
-      }
-      .position-input:focus { outline:none; border-color:var(--input-focus); }
-      .position-input::placeholder { color:var(--text-dim); }
-      .color-swatch { display:flex; align-items:center; gap:0.3rem; flex-shrink:0; }
-      .color-swatch span { font-size:0.7rem; color:var(--text-dim); }
-      input[type="color"] {
-        width:28px; height:28px; padding:0; border:1px solid var(--border);
-        border-radius:5px; cursor:pointer; background:none; overflow:hidden;
-      }
-      input[type="color"]::-webkit-color-swatch-wrapper { padding:0; margin:0; border:none; }
-      input[type="color"]::-webkit-color-swatch { border:none; border-radius:4px; }
-      input[type="color"]::-moz-color-swatch { border:none; border-radius:4px; }
+    /* MEMBERS */
+    #members { display:grid; gap:0.75rem; }
+    .member-card {
+      background:var(--surface); border-radius:10px;
+      padding:0.9rem 1.1rem; border:1px solid var(--border);
+    }
+    .member-header {
+      display:flex; align-items:center; gap:0.5rem; margin-bottom:0.7rem; flex-wrap:wrap;
+    }
+    .member-name-input {
+      background:transparent; border:none; border-bottom:1px dashed var(--border);
+      color:var(--text); font:inherit; font-size:0.97rem; font-weight:700;
+      padding:0.1rem 0.25rem; flex:1 1 160px; min-width:120px; max-width:240px;
+      transition:border-color 0.15s;
+    }
+    .member-name-input:focus { outline:none; border-bottom-color:var(--input-focus); }
+    .member-name-input::placeholder { color:var(--text-dim); font-weight:400; }
+    .dept-input {
+      background:var(--input-bg); border:1px solid var(--input-border); border-radius:6px;
+      padding:0.3rem 0.5rem; font:inherit; font-size:0.82rem; color:var(--text);
+      width:90px; flex-shrink:0; transition:border-color 0.15s;
+    }
+    .dept-input:focus { outline:none; border-color:var(--input-focus); }
+    .dept-input::placeholder { color:var(--text-dim); }
+    .position-input {
+      background:var(--input-bg); border:1px solid var(--input-border); border-radius:6px;
+      padding:0.3rem 0.5rem; font:inherit; font-size:0.82rem; font-style:italic;
+      color:var(--text-muted); flex:1 1 120px; min-width:100px; max-width:180px;
+      transition:border-color 0.15s;
+    }
+    .position-input:focus { outline:none; border-color:var(--input-focus); }
+    .position-input::placeholder { color:var(--text-dim); }
+    .color-swatch { display:flex; align-items:center; gap:0.3rem; flex-shrink:0; }
+    .color-swatch span { font-size:0.7rem; color:var(--text-dim); }
+    input[type="color"] {
+      width:28px; height:28px; padding:0; border:1px solid var(--border);
+      border-radius:5px; cursor:pointer; background:none; overflow:hidden;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding:0; margin:0; border:none; }
+    input[type="color"]::-webkit-color-swatch { border:none; border-radius:4px; }
+    input[type="color"]::-moz-color-swatch { border:none; border-radius:4px; }
 
-      /* FIELD LABELS */
-      label {
-        display:flex; flex-direction:column; gap:0.25rem;
-        font-size:0.72rem; font-weight:600; color:var(--text-muted);
-        text-transform:uppercase; letter-spacing:0.05em;
-      }
-      input:not(.member-name-input):not(.dept-input):not(.position-input):not(.member-color), select {
-        background:var(--input-bg); border:1px solid var(--input-border); border-radius:6px;
-        padding:0.4rem 0.55rem; font:inherit; font-size:0.85rem; font-weight:400;
-        color:var(--text); transition:border-color 0.15s; text-transform:none; letter-spacing:normal;
-      }
-      input:not(.member-name-input):not(.dept-input):not(.position-input):focus, select:focus {
-        outline:none; border-color:var(--input-focus);
-      }
+    /* FIELD LABELS */
+    label {
+      display:flex; flex-direction:column; gap:0.25rem;
+      font-size:0.72rem; font-weight:600; color:var(--text-muted);
+      text-transform:uppercase; letter-spacing:0.05em;
+    }
+    input:not(.member-name-input):not(.dept-input):not(.position-input):not(.member-color), select {
+      background:var(--input-bg); border:1px solid var(--input-border); border-radius:6px;
+      padding:0.4rem 0.55rem; font:inherit; font-size:0.85rem; font-weight:400;
+      color:var(--text); transition:border-color 0.15s; text-transform:none; letter-spacing:normal;
+    }
+    input:not(.member-name-input):not(.dept-input):not(.position-input):focus, select:focus {
+      outline:none; border-color:var(--input-focus);
+    }
 
-      /* CLASS ENTRIES */
-      .classes { display:grid; gap:0.4rem; margin-bottom:0.5rem; }
-      .class-entry-wrap {
-        display:flex; flex-direction:column; gap:0;
-      }
-      .class-entry {
-        display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
-        gap:0.45rem; align-items:end;
-        background:var(--surface2); border:1px solid var(--border-light);
-        border-radius:7px; padding:0.55rem 0.65rem;
-      }
-      .class-entry-wrap .class-error {
-        color:#cc3333; font-size:0.7rem; padding:0.2rem 0.65rem 0.25rem;
-        background:var(--surface2); border:1px solid var(--border-light);
-        border-top:none; border-radius:0 0 7px 7px;
-        margin:0;
-      }
+    /* CLASS ENTRIES */
+    .classes { display:grid; gap:0.4rem; margin-bottom:0.5rem; }
+    .class-entry-wrap {
+      display:flex; flex-direction:column; gap:0;
+    }
+    .class-entry {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+      gap:0.45rem; align-items:end;
+      background:var(--surface2); border:1px solid var(--border-light);
+      border-radius:7px; padding:0.55rem 0.65rem;
+    }
+    /* Ensure all controls in a class entry row share the same height,
+       including the duplicate/remove button group */
+    .class-entry > label > input,
+    .class-entry > label > select,
+    .class-entry > div > button {
+      height:2.1rem;
+      box-sizing:border-box;
+    }
+    .class-entry > div {
+      display:flex; gap:0.35rem; align-items:stretch;
+    }
+    .class-entry > div > button {
+      flex:1;
+      display:flex; align-items:center; justify-content:center;
+      padding:0 0.6rem;
+      margin:0;
+    }
+    .class-entry-wrap .class-error {
+      color:#cc3333; font-size:0.7rem; padding:0.2rem 0.65rem 0.25rem;
+      background:var(--surface2); border:1px solid var(--border-light);
+      border-top:none; border-radius:0 0 7px 7px;
+      margin:0;
+    }
 
-      /* PREVIEW */
-      .preview-controls {
-        display:flex; align-items:center; gap:0.65rem; margin-bottom:0.65rem; flex-wrap:wrap;
-      }
-      .preview-controls label { flex-direction:row; align-items:center; gap:0.4rem; font-size:0.78rem; text-transform:uppercase; }
-      .preview-controls select { width:auto; }
-      #timeline-preview {
-        background:var(--surface); border:1px solid var(--border);
-        border-radius:8px; overflow:auto; max-height:72vh;
-      }
-      .preview-grid { min-width:1100px; }
-      .preview-header, .preview-row { display:grid; grid-template-columns:180px 1fr; }
-      .preview-name {
-        border-right:1px solid var(--border); border-bottom:1px solid var(--border-light);
-        padding:0.3rem 0.5rem; font-size:0.7rem; color:var(--text);
-        display:flex; flex-direction:column; justify-content:center;
-      }
-      .preview-time {
-        position:relative; border-bottom:1px solid var(--border-light); min-height:38px;
-        background-image:repeating-linear-gradient(
-          to right, transparent, transparent calc((100% / 56) - 1px),
-          #e0e0e0 calc((100% / 56) - 1px), #e0e0e0 calc(100% / 56)
-        );
-      }
-      .preview-time.header-time { min-height:20px; border-bottom:1px solid var(--border); }
-      .preview-slot-label {
-        position:absolute; top:3px; transform:translateX(-50%);
-        font-size:0.58rem; color:var(--text-dim); white-space:nowrap;
-      }
-      .preview-block {
-        position:absolute; top:4px; height:calc(100% - 8px); min-height:22px;
-        border-radius:4px; color:#fff; font-size:0.55rem; font-weight:600;
-        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-        padding:2px 4px; box-sizing:border-box; display:flex; align-items:center;
-      }
-      .preview-empty { padding:2rem; text-align:center; color:var(--text-dim); font-size:0.85rem; }
+    /* PREVIEW */
+    .preview-controls {
+      display:flex; align-items:center; gap:0.65rem; margin-bottom:0.65rem; flex-wrap:wrap;
+    }
+    .preview-controls label { flex-direction:row; align-items:center; gap:0.4rem; font-size:0.78rem; text-transform:uppercase; }
+    .preview-controls select { width:auto; }
+    #timeline-preview {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:8px; overflow:auto; max-height:72vh;
+    }
+    .preview-grid { min-width:1100px; }
+    .preview-header, .preview-row { display:grid; grid-template-columns:180px 1fr; }
+    .preview-name {
+      border-right:1px solid var(--border); border-bottom:1px solid var(--border-light);
+      padding:0.3rem 0.5rem; font-size:0.7rem; color:var(--text);
+      display:flex; flex-direction:column; justify-content:center;
+    }
+    .preview-time {
+      position:relative; border-bottom:1px solid var(--border-light); min-height:38px;
+      background-image:repeating-linear-gradient(
+        to right, transparent, transparent calc((100% / 56) - 1px),
+        #e0e0e0 calc((100% / 56) - 1px), #e0e0e0 calc(100% / 56)
+      );
+    }
+    .preview-time.header-time { min-height:20px; border-bottom:1px solid var(--border); }
+    .preview-slot-label {
+      position:absolute; top:3px; transform:translateX(-50%);
+      font-size:0.58rem; color:var(--text-dim); white-space:nowrap;
+    }
+    .preview-block {
+      position:absolute; top:4px; height:calc(100% - 8px); min-height:22px;
+      border-radius:4px; font-size:0.55rem; font-weight:600;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      padding:2px 4px; box-sizing:border-box; display:flex; align-items:center;
+    }
+    .preview-empty { padding:2rem; text-align:center; color:var(--text-dim); font-size:0.85rem; }
 
-      /* FOOTER */
-      footer {
-        margin-top: 2.5rem;
-        padding: 1rem 1.25rem;
-        border-top: 1px solid var(--border);
-        text-align: center;
-        font-size: 0.75rem;
-        color: var(--text-dim);
-      }
-      footer a {
-        color: var(--text-muted);
-        text-decoration: none;
-        font-weight: 600;
-      }
-      footer a:hover { color: var(--text); text-decoration: underline; }
+    /* FOOTER */
+    footer {
+      margin-top: 2.5rem;
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    footer a:hover { color: var(--text); text-decoration: underline; }
 
-      /* LOGO UPLOAD */
-      .logo-upload-label {
-        display: flex; align-items: center;
-        background: var(--input-bg); border: 1px solid var(--input-border);
-        border-radius: 7px; padding: 0.42rem 0.65rem;
-        font-size: 0.82rem; color: var(--text-muted);
-        cursor: pointer; transition: border-color 0.15s;
-        text-transform: none; letter-spacing: normal; font-weight: 400;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      .logo-upload-label:hover { border-color: var(--input-focus); color: var(--text); }
-    </style>
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-    <link rel="manifest" href="site.webmanifest">
-  </head>
-  <body>
-  <main>
+    /* LOGO UPLOAD */
+    .logo-upload-label {
+      display: flex; align-items: center;
+      background: var(--input-bg); border: 1px solid var(--input-border);
+      border-radius: 7px; padding: 0.42rem 0.65rem;
+      font-size: 0.82rem; color: var(--text-muted);
+      cursor: pointer; transition: border-color 0.15s;
+      text-transform: none; letter-spacing: normal; font-weight: 400;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .logo-upload-label:hover { border-color: var(--input-focus); color: var(--text); }
+  </style>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="manifest" href="site.webmanifest">
+</head>
+<body>
+<main>
 
-    <header>
-      <div class="header-text">
-        <h1>Group Class Schedule Generator</h1>
-        <p>Enter the class schedules of your members/officers and export layouted PDFs.</p>
-      </div>
-      <div class="header-group-field">
-        <span>Learner Group</span>
-        <input id="learner-group" type="text" />
-      </div>
-      <div class="header-group-field">
-        <span>Upload Learner Group Logo <span style="font-weight:400;text-transform:none;">(optional)</span></span>
-        <label class="logo-upload-label" for="lg-logo-input">
-          <span id="logo-upload-text">Choose image…</span>
-          <input id="lg-logo-input" type="file" accept="image/*" style="display:none;" />
-        </label>
-      </div>
-    </header>
-
-    <div class="controls">
-      <button id="add-member" type="button">+ Add Member</button>
-      <!-- Download group -->
-      <div class="dl-group">
-        <select id="dl-day-select">
-          <option value="ALL">All 6 Days (one PDF)</option>
-          <option value="Monday">Monday</option>
-          <option value="Tuesday">Tuesday</option>
-          <option value="Wednesday">Wednesday</option>
-          <option value="Thursday">Thursday</option>
-          <option value="Friday">Friday</option>
-          <option value="Saturday">Saturday</option>
-        </select>
-        <button id="generate-pdfs" type="button">⬇ Download PDF</button>
-  <button id="save-project" type="button" class="has-tip" data-tip="Save your schedule to a .txt file so you can reload it later.">💾 Save Schedule</button>
-  <button id="load-project" type="button" class="has-tip" data-tip="Load a previously saved .txt schedule file to continue editing.">📂 Load Schedule</button>
-  <input id="load-project-file" type="file" accept=".txt,.json" style="display:none;">
-      </div>
+  <header>
+    <div class="header-text">
+      <h1>Group Class Schedule Generator</h1>
+      <p>Enter the class schedules of your members/officers and export layouted PDFs.</p>
     </div>
-
-    <div class="section-title">Members</div>
-    <div id="members"></div>
-
-    <div class="section-title" style="margin-top:1.25rem;">Preview</div>
-    <div class="preview-controls">
-      <label for="preview-day">Day <select id="preview-day"></select></label>
+    <div class="header-group-field">
+      <span>Learner Group</span>
+      <input id="learner-group" type="text" />
     </div>
-    <div id="timeline-preview"></div>
+    <div class="header-group-field">
+      <span>Upload Learner Group Logo <span style="font-weight:400;text-transform:none;">(optional)</span></span>
+      <label class="logo-upload-label" for="lg-logo-input">
+        <span id="logo-upload-text">Choose image…</span>
+        <input id="lg-logo-input" type="file" accept="image/*" style="display:none;" />
+      </label>
+    </div>
+  </header>
 
-  </main>
-
-  <template id="member-template">
-    <article class="member-card">
-      <div class="member-header">
-        <input class="member-name-input" type="text" placeholder="Member Name" />
-        <input class="dept-input" type="text" placeholder="Dept" />
-        <input class="position-input" type="text" placeholder="Position (optional)" />
-        <div class="color-swatch">
-          <input class="member-color" type="color" value="#888888" title="Bar color" />
-          <span>Color</span>
-        </div>
-        <button class="duplicate-member" type="button">Duplicate member</button>
-        <button class="remove-member" type="button">Remove member</button>
-      </div>
-      <div class="classes"></div>
-      <button class="add-class-btn" type="button">+ Add Class</button>
-    </article>
-  </template>
-
-  <template id="class-template">
-    <div class="class-entry">
-      <label>Day<select class="day"></select></label>
-      <label>Course Code<input class="course-code" type="text" /></label>
-      <label>Start<input class="start-time" type="time" min="07:00" max="21:00" step="900" /></label>
-      <label>End<input class="end-time" type="time" min="07:15" max="21:00" step="900" /></label>
-      <label>Room<input class="room" type="text" /></label>
-      <div style="display:flex;gap:.35rem;">
-      <button class="duplicate-class" type="button">Duplicate</button>
-      <button class="remove-class" type="button">Remove class</button>
+  <div class="controls">
+    <button id="add-member" type="button">+ Add Member</button>
+    <!-- Download group -->
+    <div class="dl-group">
+      <select id="dl-day-select">
+        <option value="ALL">All 6 Days (one PDF)</option>
+        <option value="Monday">Monday</option>
+        <option value="Tuesday">Tuesday</option>
+        <option value="Wednesday">Wednesday</option>
+        <option value="Thursday">Thursday</option>
+        <option value="Friday">Friday</option>
+        <option value="Saturday">Saturday</option>
+      </select>
+      <button id="generate-pdfs" type="button">⬇ Download PDF</button>
+<button id="save-project" type="button" class="has-tip" data-tip="Save your schedule to a .txt file so you can reload it later.">💾 Save Schedule</button>
+<button id="load-project" type="button" class="has-tip" data-tip="Load a previously saved .txt schedule file to continue editing.">📂 Load Schedule</button>
+<input id="load-project-file" type="file" accept=".txt,.json" style="display:none;">
+    </div>
   </div>
+
+  <div class="section-title">Members</div>
+  <div id="members"></div>
+
+  <div class="section-title" style="margin-top:1.25rem;">Preview</div>
+  <div class="preview-controls">
+    <label for="preview-day">Day <select id="preview-day"></select></label>
+  </div>
+  <div id="timeline-preview"></div>
+
+</main>
+
+<template id="member-template">
+  <article class="member-card">
+    <div class="member-header">
+      <input class="member-name-input" type="text" placeholder="Member Name" />
+      <input class="dept-input" type="text" placeholder="Dept" />
+      <input class="position-input" type="text" placeholder="Position (optional)" />
+      <div class="color-swatch">
+        <input class="member-color" type="color" value="#888888" title="Bar color" />
+        <span>Color</span>
+      </div>
+      <button class="duplicate-member" type="button">Duplicate member</button>
+      <button class="remove-member" type="button">Remove member</button>
     </div>
-  </template>
+    <div class="classes"></div>
+    <button class="add-class-btn" type="button">+ Add Class</button>
+  </article>
+</template>
 
-  <script>
-    const DAYS        = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const START_MIN   = 7 * 60;
-    const END_MIN     = 21 * 60;
-    const TOTAL_SLOTS = (END_MIN - START_MIN) / 15;
+<template id="class-template">
+  <div class="class-entry">
+    <label>Day<select class="day"></select></label>
+    <label>Course Code<input class="course-code" type="text" /></label>
+    <label>Start<input class="start-time" type="time" min="07:00" max="21:00" step="900" /></label>
+    <label>End<input class="end-time" type="time" min="07:15" max="21:00" step="900" /></label>
+    <label>Room<input class="room" type="text" /></label>
+    <label>Mode<select class="sync-mode">
+      <option value="sync">Synchronous</option>
+      <option value="async">Asynchronous</option>
+    </select></label>
+    <div style="display:flex;gap:.35rem;">
+    <button class="duplicate-class" type="button">Duplicate</button>
+    <button class="remove-class" type="button">Remove class</button>
+</div>
+  </div>
+</template>
 
-    // Max members per PDF page before splitting into a second page
-    const MAX_ROWS_PER_PAGE = 30;
+<script>
+  const DAYS        = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const START_MIN   = 7 * 60;
+  const END_MIN     = 21 * 60;
+  const TOTAL_SLOTS = (END_MIN - START_MIN) / 15;
 
-    const membersEl    = document.getElementById('members');
-    const previewDayEl = document.getElementById('preview-day');
-    const timelineEl   = document.getElementById('timeline-preview');
-    const lgInput      = document.getElementById('learner-group');
-    const dlDaySelect  = document.getElementById('dl-day-select');
+  // Max members per PDF page before splitting into a second page
+  const MAX_ROWS_PER_PAGE = 30;
 
+  const membersEl    = document.getElementById('members');
+  const previewDayEl = document.getElementById('preview-day');
+  const timelineEl   = document.getElementById('timeline-preview');
+  const lgInput      = document.getElementById('learner-group');
+  const dlDaySelect  = document.getElementById('dl-day-select');
+
+  DAYS.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    previewDayEl.append(o);
+  });
+
+  function fillDaySelect(sel) {
+    sel.innerHTML = '';
     DAYS.forEach(d => {
       const o = document.createElement('option');
       o.value = d; o.textContent = d;
-      previewDayEl.append(o);
+      sel.append(o);
     });
+  }
 
-    function fillDaySelect(sel) {
-      sel.innerHTML = '';
-      DAYS.forEach(d => {
-        const o = document.createElement('option');
-        o.value = d; o.textContent = d;
-        sel.append(o);
-      });
-    }
+  function parseTime(val) {
+    if (!val || !val.includes(':')) return null;
+    const [h, m] = val.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+  }
 
-    function parseTime(val) {
-      if (!val || !val.includes(':')) return null;
-      const [h, m] = val.split(':').map(Number);
-      if (isNaN(h) || isNaN(m)) return null;
-      return h * 60 + m;
-    }
+  function clamp(v) { return Math.min(END_MIN, Math.max(START_MIN, v)); }
 
-    function clamp(v) { return Math.min(END_MIN, Math.max(START_MIN, v)); }
+  // Hour-only label for timeline headers e.g. "7 AM", "1 PM"
+  function fmt(minutes) {
+    const h24  = Math.floor(minutes / 60);
+    const ampm = h24 >= 12 ? 'PM' : 'AM';
+    const h12  = h24 % 12 || 12;
+    return `${h12} ${ampm}`;
+  }
 
-    // Hour-only label for timeline headers e.g. "7 AM", "1 PM"
-    function fmt(minutes) {
-      const h24  = Math.floor(minutes / 60);
-      const ampm = h24 >= 12 ? 'PM' : 'AM';
-      const h12  = h24 % 12 || 12;
-      return `${h12} ${ampm}`;
-    }
+  // Full time for tooltips / bar labels e.g. "7:00 AM"
+  function fmtFull(minutes) {
+    const h24  = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    const ampm = h24 >= 12 ? 'PM' : 'AM';
+    const h12  = h24 % 12 || 12;
+    return `${h12}:${String(mins).padStart(2,'0')} ${ampm}`;
+  }
 
-    // Full time for tooltips / bar labels e.g. "7:00 AM"
-    function fmtFull(minutes) {
-      const h24  = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      const ampm = h24 >= 12 ? 'PM' : 'AM';
-      const h12  = h24 % 12 || 12;
-      return `${h12}:${String(mins).padStart(2,'0')} ${ampm}`;
-    }
+  // Bar label format: "6INTCALC (PGN 103)"
+  function barLabel(e) {
+    return `${e.courseCode} (${e.room})`;
+  }
 
-    // Bar label format: "6INTCALC (PGN 103)"
-    function barLabel(e) {
-      return `${e.courseCode} (${e.room})`;
-    }
+  // ── VALIDATION ───────────────────────────────────────────────────────────────
+  function validateAndMarkEntries() {
+    let hasErrors = false;
+    membersEl.querySelectorAll('.member-card').forEach(card => {
+      const fullName = card.querySelector('.member-name-input').value.trim();
+      if (!fullName) return;
 
-    // ── VALIDATION ───────────────────────────────────────────────────────────────
-    function validateAndMarkEntries() {
-      let hasErrors = false;
-      membersEl.querySelectorAll('.member-card').forEach(card => {
-        const fullName = card.querySelector('.member-name-input').value.trim();
-        if (!fullName) return;
+      // Collect valid entries per day for overlap checking
+      const byDay = {};
+      DAYS.forEach(d => byDay[d] = []);
 
-        // Collect valid entries per day for overlap checking
-        const byDay = {};
-        DAYS.forEach(d => byDay[d] = []);
+      card.querySelectorAll('.class-entry').forEach(entry => {
+        const startEl = entry.querySelector('.start-time');
+        const endEl   = entry.querySelector('.end-time');
+        const day     = entry.querySelector('.day').value;
+        const rawStart = parseTime(startEl.value);
+        const rawEnd   = parseTime(endEl.value);
 
-        card.querySelectorAll('.class-entry').forEach(entry => {
-          const startEl = entry.querySelector('.start-time');
-          const endEl   = entry.querySelector('.end-time');
-          const day     = entry.querySelector('.day').value;
-          const rawStart = parseTime(startEl.value);
-          const rawEnd   = parseTime(endEl.value);
+        // Clear previous error styles — error lives on the wrap, not inside entry
+        startEl.style.borderColor = '';
+        endEl.style.borderColor   = '';
+        const wrap = entry.closest('.class-entry-wrap') || entry;
+        wrap.querySelector('.class-error')?.remove();
 
-          // Clear previous error styles — error lives on the wrap, not inside entry
-          startEl.style.borderColor = '';
-          endEl.style.borderColor   = '';
-          const wrap = entry.closest('.class-entry-wrap') || entry;
-          wrap.querySelector('.class-error')?.remove();
+        let err = null;
 
-          let err = null;
-
-          if (rawStart === null || rawEnd === null) {
-            err = 'Missing time.';
-          } else if (rawStart < START_MIN || rawStart > END_MIN) {
-            err = `Start must be between 7:00 AM and 9:00 PM.`;
-            startEl.style.borderColor = '#cc3333';
-          } else if (rawEnd < START_MIN || rawEnd > END_MIN) {
-            err = `End must be between 7:00 AM and 9:00 PM.`;
-            endEl.style.borderColor = '#cc3333';
-          } else if (rawEnd <= rawStart) {
-            err = `End time must be after start time.`;
-            startEl.style.borderColor = '#cc3333';
-            endEl.style.borderColor   = '#cc3333';
-          } else {
-            // Check overlap with already-collected entries on same day
-            for (const prev of byDay[day]) {
-              if (rawStart < prev.end && rawEnd > prev.start) {
-                err = `Overlaps with ${prev.courseCode} (${fmtFull(prev.start)}–${fmtFull(prev.end)}).`;
-                startEl.style.borderColor = '#e07b00';
-                endEl.style.borderColor   = '#e07b00';
-                break;
-              }
+        if (rawStart === null || rawEnd === null) {
+          err = 'Missing time.';
+        } else if (rawStart < START_MIN || rawStart > END_MIN) {
+          err = `Start must be between 7:00 AM and 9:00 PM.`;
+          startEl.style.borderColor = '#cc3333';
+        } else if (rawEnd < START_MIN || rawEnd > END_MIN) {
+          err = `End must be between 7:00 AM and 9:00 PM.`;
+          endEl.style.borderColor = '#cc3333';
+        } else if (rawEnd <= rawStart) {
+          err = `End time must be after start time.`;
+          startEl.style.borderColor = '#cc3333';
+          endEl.style.borderColor   = '#cc3333';
+        } else {
+          // Check overlap with already-collected entries on same day
+          for (const prev of byDay[day]) {
+            if (rawStart < prev.end && rawEnd > prev.start) {
+              err = `Overlaps with ${prev.courseCode} (${fmtFull(prev.start)}–${fmtFull(prev.end)}).`;
+              startEl.style.borderColor = '#e07b00';
+              endEl.style.borderColor   = '#e07b00';
+              break;
             }
           }
-
-          if (err) {
-            hasErrors = true;
-            const errEl = document.createElement('div');
-            errEl.className = 'class-error';
-            errEl.textContent = '⚠ ' + err;
-            wrap.append(errEl);
-          } else if (rawStart !== null && rawEnd !== null) {
-            const courseCode = entry.querySelector('.course-code').value.trim() || '—';
-            byDay[day].push({ start: rawStart, end: rawEnd, courseCode });
-          }
-        });
-      });
-      return hasErrors;
-    }
-
-    // ── DATA ─────────────────────────────────────────────────────────────────────
-    function getData() {
-      const members = [];
-      membersEl.querySelectorAll('.member-card').forEach(card => {
-        const fullName = card.querySelector('.member-name-input').value.trim();
-        if (!fullName) return;
-
-        const dept     = card.querySelector('.dept-input').value.trim();
-        const position = card.querySelector('.position-input').value.trim();
-        const color    = card.querySelector('.member-color').value || '#888888';
-
-        const classes = [];
-        card.querySelectorAll('.class-entry').forEach(entry => {
-          const day        = entry.querySelector('.day').value;
-          const courseCode = entry.querySelector('.course-code').value.trim();
-          const room       = entry.querySelector('.room').value.trim();
-          const rawStart   = parseTime(entry.querySelector('.start-time').value);
-          const rawEnd     = parseTime(entry.querySelector('.end-time').value);
-
-          if (rawStart === null || rawEnd === null) return;
-          if (rawStart < START_MIN || rawEnd > END_MIN) return;
-          if (rawEnd <= rawStart) return;
-
-          classes.push({
-            day,
-            courseCode: courseCode || '—',
-            room:       room       || '—',
-            start: rawStart, end: rawEnd
-          });
-        });
-
-        members.push({ fullName, dept, position, color, classes });
-      });
-      return members;
-    }
-
-    // ── PREVIEW ──────────────────────────────────────────────────────────────────
-    function renderPreview() {
-      validateAndMarkEntries();
-      const day     = previewDayEl.value;
-      const members = getData();
-
-      if (!members.length) {
-        timelineEl.innerHTML = '<div class="preview-empty">Add at least one member with a name to see the preview.</div>';
-        return;
-      }
-
-      const grid = document.createElement('div');
-      grid.className = 'preview-grid';
-
-      const hdr = document.createElement('div');
-      hdr.className = 'preview-header';
-      const hName = document.createElement('div');
-      hName.className = 'preview-name';
-      hName.style.cssText = 'font-weight:700;font-size:0.68rem;color:#999;';
-      hName.textContent = 'Member';
-      hdr.append(hName);
-      const hTime = document.createElement('div');
-      hTime.className = 'preview-time header-time';
-      for (let m = START_MIN; m <= END_MIN; m += 60) {
-        const lbl = document.createElement('span');
-        lbl.className = 'preview-slot-label';
-        lbl.textContent = fmt(m);
-        lbl.style.left = `${((m - START_MIN) / (END_MIN - START_MIN)) * 100}%`;
-        hTime.append(lbl);
-      }
-      hdr.append(hTime);
-      grid.append(hdr);
-
-      members.forEach(member => {
-        const row = document.createElement('div');
-        row.className = 'preview-row';
-
-        const nameCell = document.createElement('div');
-        nameCell.className = 'preview-name';
-        const nameSpan = document.createElement('span');
-        nameSpan.style.cssText = 'font-weight:600;font-size:0.72rem;';
-        nameSpan.textContent = member.fullName + (member.dept ? ` (${member.dept})` : '');
-        nameCell.append(nameSpan);
-        if (member.position) {
-          const posSpan = document.createElement('span');
-          posSpan.style.cssText = 'font-style:italic;font-size:0.63rem;color:#888;margin-top:1px;';
-          posSpan.textContent = member.position;
-          nameCell.append(posSpan);
         }
 
-        const timeline = document.createElement('div');
-        timeline.className = 'preview-time';
+        if (err) {
+          hasErrors = true;
+          const errEl = document.createElement('div');
+          errEl.className = 'class-error';
+          errEl.textContent = '⚠ ' + err;
+          wrap.append(errEl);
+        } else if (rawStart !== null && rawEnd !== null) {
+          const courseCode = entry.querySelector('.course-code').value.trim() || '—';
+          byDay[day].push({ start: rawStart, end: rawEnd, courseCode });
+        }
+      });
+    });
+    return hasErrors;
+  }
 
-        member.classes.filter(c => c.day === day).forEach(entry => {
-          const block = document.createElement('div');
-          block.className = 'preview-block';
-          const left  = ((entry.start - START_MIN) / (END_MIN - START_MIN)) * 100;
-          const width = ((entry.end - entry.start) / (END_MIN - START_MIN)) * 100;
-          block.style.left       = `${left}%`;
-          block.style.width      = `${Math.max(width, 1.5)}%`;
-          block.style.background = member.color;
-          block.title            = `${barLabel(entry)} | ${fmtFull(entry.start)}–${fmtFull(entry.end)}`;
-          block.textContent      = barLabel(entry);
-          timeline.append(block);
+  // ── DATA ─────────────────────────────────────────────────────────────────────
+  function getData() {
+    const members = [];
+    membersEl.querySelectorAll('.member-card').forEach(card => {
+      const fullName = card.querySelector('.member-name-input').value.trim();
+      if (!fullName) return;
+
+      const dept     = card.querySelector('.dept-input').value.trim();
+      const position = card.querySelector('.position-input').value.trim();
+      const color    = card.querySelector('.member-color').value || '#888888';
+
+      const classes = [];
+      card.querySelectorAll('.class-entry').forEach(entry => {
+        const day        = entry.querySelector('.day').value;
+        const courseCode = entry.querySelector('.course-code').value.trim();
+        const room       = entry.querySelector('.room').value.trim();
+        const rawStart   = parseTime(entry.querySelector('.start-time').value);
+        const rawEnd     = parseTime(entry.querySelector('.end-time').value);
+        const syncMode   = entry.querySelector('.sync-mode').value;
+
+        if (rawStart === null || rawEnd === null) return;
+        if (rawStart < START_MIN || rawEnd > END_MIN) return;
+        if (rawEnd <= rawStart) return;
+
+        classes.push({
+          day,
+          courseCode: courseCode || '—',
+          room:       room       || '—',
+          start: rawStart, end: rawEnd,
+          syncMode
         });
-
-        row.append(nameCell, timeline);
-        grid.append(row);
       });
 
-      timelineEl.replaceChildren(grid);
+      members.push({ fullName, dept, position, color, classes });
+    });
+    return members;
+  }
+
+  // ── PREVIEW ──────────────────────────────────────────────────────────────────
+  function renderPreview() {
+    validateAndMarkEntries();
+    const day     = previewDayEl.value;
+    const members = getData();
+
+    if (!members.length) {
+      timelineEl.innerHTML = '<div class="preview-empty">Add at least one member with a name to see the preview.</div>';
+      return;
     }
 
-    // ── PDF HELPERS ───────────────────────────────────────────────────────────────
-    function hexToRgb(hex) {
-      return [
-        parseInt(hex.slice(1,3),16),
-        parseInt(hex.slice(3,5),16),
-        parseInt(hex.slice(5,7),16)
-      ];
+    const grid = document.createElement('div');
+    grid.className = 'preview-grid';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'preview-header';
+    const hName = document.createElement('div');
+    hName.className = 'preview-name';
+    hName.style.cssText = 'font-weight:700;font-size:0.68rem;color:#999;';
+    hName.textContent = 'Member';
+    hdr.append(hName);
+    const hTime = document.createElement('div');
+    hTime.className = 'preview-time header-time';
+    for (let m = START_MIN; m <= END_MIN; m += 60) {
+      const lbl = document.createElement('span');
+      lbl.className = 'preview-slot-label';
+      lbl.textContent = fmt(m);
+      lbl.style.left = `${((m - START_MIN) / (END_MIN - START_MIN)) * 100}%`;
+      hTime.append(lbl);
     }
+    hdr.append(hTime);
+    grid.append(hdr);
 
-    // Stored logo data URL (set when user picks a file)
-    let lgLogoDataUrl = null;
-    let lgLogoMime    = 'JPEG';
+    members.forEach(member => {
+      const row = document.createElement('div');
+      row.className = 'preview-row';
 
-    document.getElementById('lg-logo-input').addEventListener('change', function() {
-      const file = this.files[0];
-      if (!file) return;
-      document.getElementById('logo-upload-text').textContent = file.name;
-      const reader = new FileReader();
-      reader.onload = e => {
-        lgLogoDataUrl = e.target.result;
-        // detect mime for jsPDF
-        lgLogoMime = file.type === 'image/png' ? 'PNG' : 'JPEG';
-      };
-      reader.readAsDataURL(file);
+      const nameCell = document.createElement('div');
+      nameCell.className = 'preview-name';
+      const nameSpan = document.createElement('span');
+      nameSpan.style.cssText = 'font-weight:600;font-size:0.72rem;';
+      nameSpan.textContent = member.fullName + (member.dept ? ` (${member.dept})` : '');
+      nameCell.append(nameSpan);
+      if (member.position) {
+        const posSpan = document.createElement('span');
+        posSpan.style.cssText = 'font-style:italic;font-size:0.63rem;color:#888;margin-top:1px;';
+        posSpan.textContent = member.position;
+        nameCell.append(posSpan);
+      }
+
+      const timeline = document.createElement('div');
+      timeline.className = 'preview-time';
+
+      member.classes.filter(c => c.day === day).forEach(entry => {
+        const block = document.createElement('div');
+        block.className = 'preview-block';
+        const left  = ((entry.start - START_MIN) / (END_MIN - START_MIN)) * 100;
+        const width = ((entry.end - entry.start) / (END_MIN - START_MIN)) * 100;
+        block.style.left  = `${left}%`;
+        block.style.width = `${Math.max(width, 1.5)}%`;
+
+        if (entry.syncMode === 'async') {
+          block.style.background = 'transparent';
+          block.style.border     = `2px dashed ${member.color}`;
+          block.style.color      = member.color;
+        } else {
+          block.style.background = member.color;
+          block.style.border     = 'none';
+          block.style.color      = '#fff';
+        }
+
+        block.title       = `${barLabel(entry)} | ${fmtFull(entry.start)}–${fmtFull(entry.end)}`;
+        block.textContent = barLabel(entry);
+        timeline.append(block);
+      });
+
+      row.append(nameCell, timeline);
+      grid.append(row);
     });
 
-    /**
-     * Draw one page of rows for a given day.
-     * pageNum / totalPages are GLOBAL across all days in this PDF export.
-     */
-    function drawDayPage(pdf, day, members, allMembers, learnerGroup, pageNum, totalPages) {
-      const PW = 841.89, PH = 595.28;
-      const margin = 20;
+    timelineEl.replaceChildren(grid);
+  }
 
-      // ── Single-line header height ─────────────────────────────────────────
-      const headerH    = 18;   // one compact line
-      // Time row must be tall enough for rotated labels (longest label ≈ "12 PM" ~18pt wide at 6pt font → fits in ~22pt)
-      const timeRowH   = 26;
+  // ── PDF HELPERS ───────────────────────────────────────────────────────────────
+  function hexToRgb(hex) {
+    return [
+      parseInt(hex.slice(1,3),16),
+      parseInt(hex.slice(3,5),16),
+      parseInt(hex.slice(5,7),16)
+    ];
+  }
 
-      // ── Compute rowH from a FIXED row count so all pages are consistent ──
-      // Use MAX_ROWS_PER_PAGE as the baseline so every page—full or partial—
-      // shares the same row height, font sizes, and name column width.
-      const gridTopEst    = margin + headerH + timeRowH;
-      const gridBottomEst = PH - margin;
-      const rowsHEst      = gridBottomEst - gridTopEst;
-      const rowCount      = Math.min(allMembers.length, MAX_ROWS_PER_PAGE) || 1;
-      const rowH          = Math.max(14, rowsHEst / rowCount);
+  // Stored logo data URL (set when user picks a file)
+  let lgLogoDataUrl = null;
+  let lgLogoMime    = 'JPEG';
 
-      // Responsive font sizes
-      const nameFontSz      = Math.min(14, Math.max(8,  rowH * 0.45));
-      const posFontSz       = Math.min(10, Math.max(6,  rowH * 0.32));
-      const barFontSz       = Math.min(11, Math.max(7,  rowH * 0.42));
-      const timeLabelFontSz = 6;    // fixed small size for rotated labels
-      const headerFontSz    = 10;   // single-line header text
+  document.getElementById('lg-logo-input').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    document.getElementById('logo-upload-text').textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = e => {
+      lgLogoDataUrl = e.target.result;
+      // detect mime for jsPDF
+      lgLogoMime = file.type === 'image/png' ? 'PNG' : 'JPEG';
+    };
+    reader.readAsDataURL(file);
+  });
 
-      // ── Measure longest name across ALL members (not just this chunk) ─────
+  /**
+   * Draw one page of rows for a given day.
+   * pageNum / totalPages are GLOBAL across all days in this PDF export.
+   */
+  function drawDayPage(pdf, day, members, allMembers, learnerGroup, pageNum, totalPages) {
+    const PW = 841.89, PH = 595.28;
+    const margin = 20;
+
+    // ── Single-line header height ─────────────────────────────────────────
+    const headerH    = 18;   // one compact line
+    // Time row must be tall enough for rotated labels (longest label ≈ "12 PM" ~18pt wide at 6pt font → fits in ~22pt)
+    const timeRowH   = 26;
+
+    // ── Compute rowH from a FIXED row count so all pages are consistent ──
+    // Use MAX_ROWS_PER_PAGE as the baseline so every page—full or partial—
+    // shares the same row height, font sizes, and name column width.
+    const gridTopEst    = margin + headerH + timeRowH;
+    const gridBottomEst = PH - margin;
+    const rowsHEst      = gridBottomEst - gridTopEst;
+    const rowCount      = Math.min(allMembers.length, MAX_ROWS_PER_PAGE) || 1;
+    const rowH          = Math.max(14, rowsHEst / rowCount);
+
+    // Responsive font sizes
+    const nameFontSz      = Math.min(14, Math.max(8,  rowH * 0.45));
+    const posFontSz       = Math.min(10, Math.max(6,  rowH * 0.32));
+    const barFontSz       = Math.min(11, Math.max(7,  rowH * 0.42));
+    const timeLabelFontSz = 6;    // fixed small size for rotated labels
+    const headerFontSz    = 10;   // single-line header text
+
+    // ── Measure longest name across ALL members (not just this chunk) ─────
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(nameFontSz);
+    let longestWidth = 0;
+    allMembers.forEach(member => {
+      const label = member.dept ? `${member.fullName} (${member.dept})` : member.fullName;
+      longestWidth = Math.max(longestWidth, pdf.getTextWidth(label));
+    });
+    const nameColW   = Math.min(Math.max(longestWidth + 16, 80), 260);
+    const timelineX  = margin + nameColW;
+    const timelineW  = PW - margin - timelineX;
+    const gridTop    = gridTopEst;
+    const gridBottom = gridBottomEst;
+
+    // White background
+    pdf.setFillColor(255,255,255);
+    pdf.rect(0, 0, PW, PH, 'F');
+
+    // ── Single-line header: logo | title  ·  DAY  ·  Page X/Y ───────────
+    const lineY = margin + headerH * 0.78;   // baseline for all header text
+
+    // Logo (if present) — scaled to fit within headerH
+    let curX = margin;
+    const logoH = headerH - 2;
+    if (lgLogoDataUrl) {
+      try {
+        pdf.addImage(lgLogoDataUrl, lgLogoMime, curX, margin + 1, logoH, logoH);
+        curX += logoH + 5;
+      } catch(e) { /* skip */ }
+    }
+
+    // Learner group / title
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(headerFontSz);
+    pdf.setTextColor(20,20,20);
+    pdf.text(learnerGroup || 'Class Schedule', curX, lineY);
+
+    // Day — centered in page
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(headerFontSz + 2);
+    pdf.setTextColor(40,40,40);
+    const dayW = pdf.getTextWidth(day);
+    pdf.text(day, (PW - dayW) / 2, lineY);
+
+    // Page number — right-aligned
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(headerFontSz - 2);
+    pdf.setTextColor(140,140,140);
+    const pageLabel = totalPages > 1 ? `Page ${pageNum}/${totalPages}` : '';
+    if (pageLabel) {
+      const pgW = pdf.getTextWidth(pageLabel);
+      pdf.text(pageLabel, PW - margin - pgW, lineY);
+    }
+
+    // Thin separator under header
+    pdf.setDrawColor(200,200,200);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, margin + headerH, PW - margin, margin + headerH);
+
+    // ── Actual bottom of grid = last member row (not full page height) ────
+    const actualGridBottom = gridTop + members.length * rowH;
+
+    // ── Vertical time labels + grid lines (every 30 min = every 2 slots) ──
+    const labBaseline = gridTop - 2;   // bottom of the rotated-text area
+    pdf.setFontSize(timeLabelFontSz);
+    pdf.setTextColor(140,140,140);
+    pdf.setDrawColor(210,210,210);
+
+    for (let i = 0; i <= TOTAL_SLOTS; i++) {
+      const x = timelineX + (i / TOTAL_SLOTS) * timelineW;
+      // Thicker line on the hour (every 4 slots), medium on half-hour (every 2), thin otherwise
+      if (i % 4 === 0)      pdf.setLineWidth(0.5);
+      else if (i % 2 === 0) pdf.setLineWidth(0.25);
+      else                  pdf.setLineWidth(0.1);
+      pdf.line(x, gridTop, x, actualGridBottom);
+
+      // Label every 30 min (i % 2 === 0); use fmt() for hours, fmtFull() for half-hours
+      if (i % 2 === 0) {
+        const m = START_MIN + i * 15;
+        // Choose label: short "7 AM" on the hour, "7:30" on the half
+        const labelText = (m % 60 === 0) ? fmt(m) : `${Math.floor(m/60) % 12 || 12}:30`;
+        // Rotate text 90° counter-clockwise so it reads bottom-to-top
+        pdf.saveGraphicsState();
+        pdf.text(labelText, x, labBaseline, { angle: 90, align: 'left' });
+        pdf.restoreGraphicsState();
+      }
+    }
+
+    // ── Separator line under time-label row ───────────────────────────────
+    pdf.setDrawColor(180,180,180);
+    pdf.setLineWidth(0.4);
+    pdf.line(margin, gridTop, PW - margin, gridTop);
+
+    // ── Member rows ───────────────────────────────────────────────────────
+    members.forEach((member, idx) => {
+      const y = gridTop + idx * rowH;
+
+      pdf.setDrawColor(220,220,220);
+      pdf.setLineWidth(0.2);
+      pdf.line(margin, y + rowH, PW - margin, y + rowH);
+
+      const hasPos    = !!member.position;
+      const nameLabel = member.dept ? `${member.fullName} (${member.dept})` : member.fullName;
+
       pdf.setFont('helvetica','bold');
       pdf.setFontSize(nameFontSz);
-      let longestWidth = 0;
-      allMembers.forEach(member => {
-        const label = member.dept ? `${member.fullName} (${member.dept})` : member.fullName;
-        longestWidth = Math.max(longestWidth, pdf.getTextWidth(label));
-      });
-      const nameColW   = Math.min(Math.max(longestWidth + 16, 80), 260);
-      const timelineX  = margin + nameColW;
-      const timelineW  = PW - margin - timelineX;
-      const gridTop    = gridTopEst;
-      const gridBottom = gridBottomEst;
+      const nameLines     = pdf.splitTextToSize(nameLabel, nameColW - 4);
+      const nameLineH     = nameFontSz * 1.15;
+      const posLineH      = posFontSz  * 1.15;
+      const gap           = 0.5;   // tight gap between name and position
+      const nameBlockH    = nameLines.length * nameLineH;
+      const textBlockH    = hasPos ? nameBlockH + gap + posLineH : nameBlockH;
 
-      // White background
-      pdf.setFillColor(255,255,255);
-      pdf.rect(0, 0, PW, PH, 'F');
+      const scale         = textBlockH > rowH - 4 ? (rowH - 4) / textBlockH : 1;
+      const drawNameSz    = nameFontSz * scale;
+      const drawPosSz     = posFontSz  * scale;
+      const drawNameLH    = nameLineH  * scale;
+      const drawGap       = gap        * scale;
+      const drawBlockH    = textBlockH * scale;
+      const textTopY      = y + (rowH - drawBlockH) / 2 + drawNameSz * 0.75;
 
-      // ── Single-line header: logo | title  ·  DAY  ·  Page X/Y ───────────
-      const lineY = margin + headerH * 0.78;   // baseline for all header text
-
-      // Logo (if present) — scaled to fit within headerH
-      let curX = margin;
-      const logoH = headerH - 2;
-      if (lgLogoDataUrl) {
-        try {
-          pdf.addImage(lgLogoDataUrl, lgLogoMime, curX, margin + 1, logoH, logoH);
-          curX += logoH + 5;
-        } catch(e) { /* skip */ }
-      }
-
-      // Learner group / title
-      pdf.setFont('helvetica','bold');
-      pdf.setFontSize(headerFontSz);
       pdf.setTextColor(20,20,20);
-      pdf.text(learnerGroup || 'Class Schedule', curX, lineY);
-
-      // Day — centered in page
       pdf.setFont('helvetica','bold');
-      pdf.setFontSize(headerFontSz + 2);
-      pdf.setTextColor(40,40,40);
-      const dayW = pdf.getTextWidth(day);
-      pdf.text(day, (PW - dayW) / 2, lineY);
+      pdf.setFontSize(drawNameSz);
+      const drawNameLines = pdf.splitTextToSize(nameLabel, nameColW - 4);
+      drawNameLines.forEach((line, li) => {
+        pdf.text(line, margin + 2, textTopY + li * drawNameLH);
+      });
 
-      // Page number — right-aligned
-      pdf.setFont('helvetica','normal');
-      pdf.setFontSize(headerFontSz - 2);
-      pdf.setTextColor(140,140,140);
-      const pageLabel = totalPages > 1 ? `Page ${pageNum}/${totalPages}` : '';
-      if (pageLabel) {
-        const pgW = pdf.getTextWidth(pageLabel);
-        pdf.text(pageLabel, PW - margin - pgW, lineY);
+      if (hasPos) {
+        pdf.setTextColor(110,110,110);
+        pdf.setFont('helvetica','italic');
+        pdf.setFontSize(drawPosSz);
+        const posY = textTopY + drawNameLines.length * drawNameLH + drawGap;
+        pdf.text(member.position, margin + 2, posY, { maxWidth: nameColW - 4 });
       }
 
-      // Thin separator under header
-      pdf.setDrawColor(200,200,200);
-      pdf.setLineWidth(0.3);
-      pdf.line(margin, margin + headerH, PW - margin, margin + headerH);
+      member.classes.filter(e => e.day === day).forEach(entry => {
+        const bx = timelineX + ((entry.start - START_MIN) / (END_MIN - START_MIN)) * timelineW;
+        const bw = ((entry.end - entry.start) / (END_MIN - START_MIN)) * timelineW;
+        const bh = Math.max(rowH - 4, 4);
+        const [r,g,b] = hexToRgb(member.color || '#888888');
+        const isAsync = entry.syncMode === 'async';
 
-      // ── Actual bottom of grid = last member row (not full page height) ────
-      const actualGridBottom = gridTop + members.length * rowH;
-
-      // ── Vertical time labels + grid lines (every 30 min = every 2 slots) ──
-      const labBaseline = gridTop - 2;   // bottom of the rotated-text area
-      pdf.setFontSize(timeLabelFontSz);
-      pdf.setTextColor(140,140,140);
-      pdf.setDrawColor(210,210,210);
-
-      for (let i = 0; i <= TOTAL_SLOTS; i++) {
-        const x = timelineX + (i / TOTAL_SLOTS) * timelineW;
-        // Thicker line on the hour (every 4 slots), medium on half-hour (every 2), thin otherwise
-        if (i % 4 === 0)      pdf.setLineWidth(0.5);
-        else if (i % 2 === 0) pdf.setLineWidth(0.25);
-        else                  pdf.setLineWidth(0.1);
-        pdf.line(x, gridTop, x, actualGridBottom);
-
-        // Label every 30 min (i % 2 === 0); use fmt() for hours, fmtFull() for half-hours
-        if (i % 2 === 0) {
-          const m = START_MIN + i * 15;
-          // Choose label: short "7 AM" on the hour, "7:30" on the half
-          const labelText = (m % 60 === 0) ? fmt(m) : `${Math.floor(m/60) % 12 || 12}:30`;
-          // Rotate text 90° counter-clockwise so it reads bottom-to-top
-          pdf.saveGraphicsState();
-          pdf.text(labelText, x, labBaseline, { angle: 90, align: 'left' });
-          pdf.restoreGraphicsState();
-        }
-      }
-
-      // ── Separator line under time-label row ───────────────────────────────
-      pdf.setDrawColor(180,180,180);
-      pdf.setLineWidth(0.4);
-      pdf.line(margin, gridTop, PW - margin, gridTop);
-
-      // ── Member rows ───────────────────────────────────────────────────────
-      members.forEach((member, idx) => {
-        const y = gridTop + idx * rowH;
-
-        pdf.setDrawColor(220,220,220);
-        pdf.setLineWidth(0.2);
-        pdf.line(margin, y + rowH, PW - margin, y + rowH);
-
-        const hasPos    = !!member.position;
-        const nameLabel = member.dept ? `${member.fullName} (${member.dept})` : member.fullName;
-
-        pdf.setFont('helvetica','bold');
-        pdf.setFontSize(nameFontSz);
-        const nameLines     = pdf.splitTextToSize(nameLabel, nameColW - 4);
-        const nameLineH     = nameFontSz * 1.15;
-        const posLineH      = posFontSz  * 1.15;
-        const gap           = 0.5;   // tight gap between name and position
-        const nameBlockH    = nameLines.length * nameLineH;
-        const textBlockH    = hasPos ? nameBlockH + gap + posLineH : nameBlockH;
-
-        const scale         = textBlockH > rowH - 4 ? (rowH - 4) / textBlockH : 1;
-        const drawNameSz    = nameFontSz * scale;
-        const drawPosSz     = posFontSz  * scale;
-        const drawNameLH    = nameLineH  * scale;
-        const drawGap       = gap        * scale;
-        const drawBlockH    = textBlockH * scale;
-        const textTopY      = y + (rowH - drawBlockH) / 2 + drawNameSz * 0.75;
-
-        pdf.setTextColor(20,20,20);
-        pdf.setFont('helvetica','bold');
-        pdf.setFontSize(drawNameSz);
-        const drawNameLines = pdf.splitTextToSize(nameLabel, nameColW - 4);
-        drawNameLines.forEach((line, li) => {
-          pdf.text(line, margin + 2, textTopY + li * drawNameLH);
-        });
-
-        if (hasPos) {
-          pdf.setTextColor(110,110,110);
-          pdf.setFont('helvetica','italic');
-          pdf.setFontSize(drawPosSz);
-          const posY = textTopY + drawNameLines.length * drawNameLH + drawGap;
-          pdf.text(member.position, margin + 2, posY, { maxWidth: nameColW - 4 });
-        }
-
-        member.classes.filter(e => e.day === day).forEach(entry => {
-          const bx = timelineX + ((entry.start - START_MIN) / (END_MIN - START_MIN)) * timelineW;
-          const bw = ((entry.end - entry.start) / (END_MIN - START_MIN)) * timelineW;
-          const bh = Math.max(rowH - 4, 4);
-          const [r,g,b] = hexToRgb(member.color || '#888888');
-
+        if (isAsync) {
+          // Muted, dashed-outline block for asynchronous classes
+          pdf.setDrawColor(r,g,b);
+          pdf.setLineWidth(0.75);
+          pdf.setLineDashPattern([2, 1.5], 0);
+          pdf.rect(bx, y + 2, Math.max(bw, 2), bh, 'S');
+          pdf.setLineDashPattern([], 0); // reset dash for subsequent drawing
+        } else {
+          // Solid fill for synchronous classes
           pdf.setFillColor(r,g,b);
           pdf.rect(bx, y + 2, Math.max(bw, 2), bh, 'F');
+        }
 
-          // ── Bar text: fit font to both bar height and bar width ────────────
-          const barPadX   = 2;
-          const barPadY   = 1.5;
-          const maxTextW  = bw - barPadX * 2;
-          const maxTextH  = bh - barPadY * 2;
-          // Only attempt text if there's meaningful room
-          if (maxTextW > 4 && maxTextH > 4) {
-            const label = barLabel(entry);
-            // Start from barFontSz, shrink until text fits width OR font hits floor
-            let fs = barFontSz;
-            const minFs = 4;
-            pdf.setFont('helvetica','bold');
-            while (fs > minFs) {
-              pdf.setFontSize(fs);
-              const lines = pdf.splitTextToSize(label, maxTextW);
-              const neededH = lines.length * fs * 1.15;
-              if (neededH <= maxTextH) break;
-              fs -= 0.5;
-            }
+        // ── Bar text: fit font to both bar height and bar width ────────────
+        const barPadX   = 2;
+        const barPadY   = 1.5;
+        const maxTextW  = bw - barPadX * 2;
+        const maxTextH  = bh - barPadY * 2;
+        // Only attempt text if there's meaningful room
+        if (maxTextW > 4 && maxTextH > 4) {
+          const label = barLabel(entry);
+          // Start from barFontSz, shrink until text fits width OR font hits floor
+          let fs = barFontSz;
+          const minFs = 4;
+          pdf.setFont('helvetica','bold');
+          while (fs > minFs) {
             pdf.setFontSize(fs);
-            // Final split at chosen size — take only as many lines as fit
-            const lines     = pdf.splitTextToSize(label, maxTextW);
-            const lineH     = fs * 1.15;
-            const maxLines  = Math.max(1, Math.floor(maxTextH / lineH));
-            const visLines  = lines.slice(0, maxLines);
-            // If last visible line was truncated, add ellipsis
-            if (visLines.length < lines.length) {
-              let last = visLines[visLines.length - 1];
-              while (last.length > 1 && pdf.getTextWidth(last + '…') > maxTextW) {
-                last = last.slice(0, -1);
-              }
-              visLines[visLines.length - 1] = last + '…';
-            }
-            const blockH   = visLines.length * lineH;
-            const textTopB = y + 2 + (bh - blockH) / 2 + fs * 0.75;
-            pdf.setTextColor(255,255,255);
-            visLines.forEach((line, li) => {
-              pdf.text(line, bx + barPadX, textTopB + li * lineH);
-            });
+            const lines = pdf.splitTextToSize(label, maxTextW);
+            const neededH = lines.length * fs * 1.15;
+            if (neededH <= maxTextH) break;
+            fs -= 0.5;
           }
-        });
+          pdf.setFontSize(fs);
+          // Final split at chosen size — take only as many lines as fit
+          const lines     = pdf.splitTextToSize(label, maxTextW);
+          const lineH     = fs * 1.15;
+          const maxLines  = Math.max(1, Math.floor(maxTextH / lineH));
+          const visLines  = lines.slice(0, maxLines);
+          // If last visible line was truncated, add ellipsis
+          if (visLines.length < lines.length) {
+            let last = visLines[visLines.length - 1];
+            while (last.length > 1 && pdf.getTextWidth(last + '…') > maxTextW) {
+              last = last.slice(0, -1);
+            }
+            visLines[visLines.length - 1] = last + '…';
+          }
+          const blockH   = visLines.length * lineH;
+          const textTopB = y + 2 + (bh - blockH) / 2 + fs * 0.75;
+          // Text color: white on solid sync fill, member color on muted async outline
+          if (isAsync) pdf.setTextColor(r,g,b);
+          else         pdf.setTextColor(255,255,255);
+          visLines.forEach((line, li) => {
+            pdf.text(line, bx + barPadX, textTopB + li * lineH);
+          });
+        }
       });
+    });
 
-      // ── Name/timeline separator (only down to last row) ───────────────────
-      pdf.setDrawColor(180,180,180);
-      pdf.setLineWidth(0.4);
-      pdf.line(timelineX, margin + headerH, timelineX, actualGridBottom);
-    }
-
-    /**
-     * Add all pages for a given day.
-     * pageOffset = how many pages have already been added before this day.
-     * totalPages = grand total across all days in this export.
-     */
-    function addDayToPdf(pdf, day, allMembers, learnerGroup, isFirstPage, pageOffset, totalPages) {
-      const chunks = [];
-      for (let i = 0; i < allMembers.length; i += MAX_ROWS_PER_PAGE) {
-        chunks.push(allMembers.slice(i, i + MAX_ROWS_PER_PAGE));
-      }
-      if (chunks.length === 0) chunks.push([]);
-
-      chunks.forEach((chunk, ci) => {
-        if (!isFirstPage || ci > 0) pdf.addPage();
-        isFirstPage = false;
-        drawDayPage(pdf, day, chunk, allMembers, learnerGroup, pageOffset + ci + 1, totalPages);
-      });
-    }
-
-    // ── GENERATE PDF(S) ───────────────────────────────────────────────────────────
-    function generatePdfs() {
-      const hasErrors = validateAndMarkEntries();
-      if (hasErrors) {
-        alert('Please fix the highlighted errors before generating PDFs.\n\nCheck for: invalid times (outside 7 AM–9 PM), end time before start time, or overlapping classes.');
-        return;
-      }
-      const members = getData();
-      const lg      = lgInput.value.trim();
-      const dlDay   = dlDaySelect.value;
-
-      if (!members.length) {
-        alert('Add at least one member with a name before generating PDFs.');
-        return;
-      }
-
-      const { jsPDF } = window.jspdf;
-
-      // Helper: how many pages does one day need?
-      function pagesForDay(memberCount) {
-        return Math.max(1, Math.ceil(memberCount / MAX_ROWS_PER_PAGE));
-      }
-
-      if (dlDay === 'ALL') {
-        const totalPages = DAYS.reduce((sum, _) => sum + pagesForDay(members.length), 0);
-        const pdf = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
-        let pageOffset = 0;
-        DAYS.forEach((day, di) => {
-          addDayToPdf(pdf, day, members, lg, di === 0, pageOffset, totalPages);
-          pageOffset += pagesForDay(members.length);
-        });
-        const filename = lg ? `${lg.replace(/\s+/g,'-')}-all-days.pdf` : 'all-days-schedule.pdf';
-        pdf.save(filename);
-      } else {
-        const totalPages = pagesForDay(members.length);
-        const pdf = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
-        addDayToPdf(pdf, dlDay, members, lg, true, 0, totalPages);
-        const filename = lg
-          ? `${lg.replace(/\s+/g,'-')}-${dlDay.toLowerCase()}.pdf`
-          : `${dlDay.toLowerCase()}-schedule.pdf`;
-        pdf.save(filename);
-      }
-    }
-
-    // -- DUPLICATE CLASS
-    function getDuplicateDay(day) {
-    const map = {
-      Monday: 'Thursday',
-      Thursday: 'Monday',
-      Tuesday: 'Friday',
-      Friday: 'Tuesday',
-      Wednesday: 'Saturday',
-      Saturday: 'Wednesday'
-    };
-    return map[day] || day;
+    // ── Name/timeline separator (only down to last row) ───────────────────
+    pdf.setDrawColor(180,180,180);
+    pdf.setLineWidth(0.4);
+    pdf.line(timelineX, margin + headerH, timelineX, actualGridBottom);
   }
 
-    function minutesToTimeString(minutes) {
-      return (
-        String(Math.floor(minutes / 60)).padStart(2, '0') +
-        ':' +
-        String(minutes % 60).padStart(2, '0')
-      );
+  /**
+   * Add all pages for a given day.
+   * pageOffset = how many pages have already been added before this day.
+   * totalPages = grand total across all days in this export.
+   */
+  function addDayToPdf(pdf, day, allMembers, learnerGroup, isFirstPage, pageOffset, totalPages) {
+    const chunks = [];
+    for (let i = 0; i < allMembers.length; i += MAX_ROWS_PER_PAGE) {
+      chunks.push(allMembers.slice(i, i + MAX_ROWS_PER_PAGE));
+    }
+    if (chunks.length === 0) chunks.push([]);
+
+    chunks.forEach((chunk, ci) => {
+      if (!isFirstPage || ci > 0) pdf.addPage();
+      isFirstPage = false;
+      drawDayPage(pdf, day, chunk, allMembers, learnerGroup, pageOffset + ci + 1, totalPages);
+    });
+  }
+
+  // ── GENERATE PDF(S) ───────────────────────────────────────────────────────────
+  function generatePdfs() {
+    const hasErrors = validateAndMarkEntries();
+    if (hasErrors) {
+      alert('Please fix the highlighted errors before generating PDFs.\n\nCheck for: invalid times (outside 7 AM–9 PM), end time before start time, or overlapping classes.');
+      return;
+    }
+    const members = getData();
+    const lg      = lgInput.value.trim();
+    const dlDay   = dlDaySelect.value;
+
+    if (!members.length) {
+      alert('Add at least one member with a name before generating PDFs.');
+      return;
     }
 
+    const { jsPDF } = window.jspdf;
 
-    // ── ADD MEMBER ────────────────────────────────────────────────────────────────
-    function addClassEntry(card) {
-    const tpl   = document.getElementById('class-template');
-    const entry = tpl.content.firstElementChild.cloneNode(true);
+    // Helper: how many pages does one day need?
+    function pagesForDay(memberCount) {
+      return Math.max(1, Math.ceil(memberCount / MAX_ROWS_PER_PAGE));
+    }
 
-    fillDaySelect(entry.querySelector('.day'));
+    if (dlDay === 'ALL') {
+      const totalPages = DAYS.reduce((sum, _) => sum + pagesForDay(members.length), 0);
+      const pdf = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
+      let pageOffset = 0;
+      DAYS.forEach((day, di) => {
+        addDayToPdf(pdf, day, members, lg, di === 0, pageOffset, totalPages);
+        pageOffset += pagesForDay(members.length);
+      });
+      const filename = lg ? `${lg.replace(/\s+/g,'-')}-all-days.pdf` : 'all-days-schedule.pdf';
+      pdf.save(filename);
+    } else {
+      const totalPages = pagesForDay(members.length);
+      const pdf = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4' });
+      addDayToPdf(pdf, dlDay, members, lg, true, 0, totalPages);
+      const filename = lg
+        ? `${lg.replace(/\s+/g,'-')}-${dlDay.toLowerCase()}.pdf`
+        : `${dlDay.toLowerCase()}-schedule.pdf`;
+      pdf.save(filename);
+    }
+  }
 
-    entry.querySelector('.start-time').value = '07:00';
-    entry.querySelector('.end-time').value   = '09:00';
+  // -- DUPLICATE CLASS
+  function getDuplicateDay(day) {
+  const map = {
+    Monday: 'Thursday',
+    Thursday: 'Monday',
+    Tuesday: 'Friday',
+    Friday: 'Tuesday',
+    Wednesday: 'Saturday',
+    Saturday: 'Wednesday'
+  };
+  return map[day] || day;
+}
 
-    const wrap = document.createElement('div');
-    wrap.className = 'class-entry-wrap';
-    wrap.append(entry);
-
-    entry.querySelector('.remove-class').addEventListener('click', () => {
-      wrap.remove();
-      renderPreview();
-    });
-
-    entry.querySelector('.duplicate-class').addEventListener('click', () => {
-      const classesContainer = card.querySelector('.classes');
-
-      addClassEntry(card);
-
-      const newWrap = classesContainer.lastElementChild;
-      const newEntry = newWrap.querySelector('.class-entry');
-
-      const day = entry.querySelector('.day').value;
-
-      newEntry.querySelector('.day').value =
-        getDuplicateDay(day);
-
-      newEntry.querySelector('.course-code').value =
-        entry.querySelector('.course-code').value;
-
-      newEntry.querySelector('.room').value =
-        entry.querySelector('.room').value;
-
-      newEntry.querySelector('.start-time').value =
-        entry.querySelector('.start-time').value;
-
-      newEntry.querySelector('.end-time').value =
-        entry.querySelector('.end-time').value;
-
-      renderPreview();
-      markUnsaved();
-    });
-
-    entry.querySelectorAll('input, select').forEach(el =>
-      el.addEventListener('input', renderPreview)
+  function minutesToTimeString(minutes) {
+    return (
+      String(Math.floor(minutes / 60)).padStart(2, '0') +
+      ':' +
+      String(minutes % 60).padStart(2, '0')
     );
-
-    card.querySelector('.classes').append(wrap);
   }
-    function duplicateMember(card) {
-    const tpl    = document.getElementById('member-template');
+
+
+  // ── ADD MEMBER ────────────────────────────────────────────────────────────────
+  function addClassEntry(card) {
+  const tpl   = document.getElementById('class-template');
+  const entry = tpl.content.firstElementChild.cloneNode(true);
+
+  fillDaySelect(entry.querySelector('.day'));
+
+  entry.querySelector('.start-time').value = '07:00';
+  entry.querySelector('.end-time').value   = '09:00';
+  entry.querySelector('.sync-mode').value  = 'sync';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'class-entry-wrap';
+  wrap.append(entry);
+
+  entry.querySelector('.remove-class').addEventListener('click', () => {
+    wrap.remove();
+    renderPreview();
+  });
+
+  entry.querySelector('.duplicate-class').addEventListener('click', () => {
+    const classesContainer = card.querySelector('.classes');
+
+    addClassEntry(card);
+
+    const newWrap = classesContainer.lastElementChild;
+    const newEntry = newWrap.querySelector('.class-entry');
+
+    const day = entry.querySelector('.day').value;
+
+    newEntry.querySelector('.day').value =
+      getDuplicateDay(day);
+
+    newEntry.querySelector('.course-code').value =
+      entry.querySelector('.course-code').value;
+
+    newEntry.querySelector('.room').value =
+      entry.querySelector('.room').value;
+
+    newEntry.querySelector('.start-time').value =
+      entry.querySelector('.start-time').value;
+
+    newEntry.querySelector('.end-time').value =
+      entry.querySelector('.end-time').value;
+
+    // Duplicated classes are always set to Asynchronous by default,
+    // regardless of the original class's mode.
+    newEntry.querySelector('.sync-mode').value = 'async';
+
+    renderPreview();
+    markUnsaved();
+  });
+
+  entry.querySelectorAll('input, select').forEach(el =>
+    el.addEventListener('input', renderPreview)
+  );
+
+  card.querySelector('.classes').append(wrap);
+}
+
+  // ── DUPLICATE MEMBER ─────────────────────────────────────────────────────────
+  function duplicateMember(card) {
+    const tpl     = document.getElementById('member-template');
     const newCard = tpl.content.firstElementChild.cloneNode(true);
 
     // Blank name and position; keep dept and color
@@ -970,7 +1030,7 @@
 
     wireMemberCard(newCard);
 
-    // Remove the default class entry added by wireMemberCard/addClassEntry, then copy all classes
+    // Remove the default class entry added by wireMemberCard, then copy all classes
     newCard.querySelector('.classes').innerHTML = '';
     card.querySelectorAll('.class-entry').forEach(entry => {
       addClassEntry(newCard);
@@ -982,149 +1042,157 @@
       newEntry.querySelector('.room').value        = entry.querySelector('.room').value;
       newEntry.querySelector('.start-time').value  = entry.querySelector('.start-time').value;
       newEntry.querySelector('.end-time').value    = entry.querySelector('.end-time').value;
+
+      // Synchronous classes become asynchronous by default on member duplication
+      const origMode = entry.querySelector('.sync-mode').value;
+      newEntry.querySelector('.sync-mode').value = (origMode === 'sync') ? 'async' : origMode;
     });
 
     card.after(newCard);
   }
+
   function wireMemberCard(card) {
-  card.querySelector('.remove-member').addEventListener('click', () => {
-    const name = card.querySelector('.member-name-input').value.trim() || 'this member';
-    if (!confirm(`Remove ${name}? This cannot be undone.`)) return;
-    card.remove(); renderPreview();
-  });
-  card.querySelector('.duplicate-member').addEventListener('click', () => {
-    duplicateMember(card);
-    renderPreview();
-    markUnsaved();
-  });
-  card.querySelector('.add-class-btn').addEventListener('click', () => {
-    addClassEntry(card); renderPreview(); markUnsaved();
-  });
-  card.querySelectorAll('.member-name-input, .dept-input, .position-input, .member-color')
-      .forEach(el => el.addEventListener('input', renderPreview));
-}
+    card.querySelector('.remove-member').addEventListener('click', () => {
+      const name = card.querySelector('.member-name-input').value.trim() || 'this member';
+      if (!confirm(`Remove ${name}? This cannot be undone.`)) return;
+      card.remove(); renderPreview();
+    });
+    card.querySelector('.duplicate-member').addEventListener('click', () => {
+      duplicateMember(card);
+      renderPreview();
+      markUnsaved();
+    });
+    card.querySelector('.add-class-btn').addEventListener('click', () => {
+      addClassEntry(card); renderPreview(); markUnsaved();
+    });
+    card.querySelectorAll('.member-name-input, .dept-input, .position-input, .member-color')
+        .forEach(el => el.addEventListener('input', renderPreview));
+  }
 
   function addMember() {
     const tpl  = document.getElementById('member-template');
     const card = tpl.content.firstElementChild.cloneNode(true);
+
     wireMemberCard(card);
+
     addClassEntry(card);
     membersEl.append(card);
   }
 
-    
-  function exportProject() {
-    const data = {
-      learnerGroup: lgInput.value,
-      logo: lgLogoDataUrl,
-      logoMime: lgLogoMime,
-      members: getData()
-    };
-    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = (data.learnerGroup || 'schedule') + '.txt';
-    a.click();
-  }
+  
+function exportProject() {
+  const data = {
+    learnerGroup: lgInput.value,
+    logo: lgLogoDataUrl,
+    logoMime: lgLogoMime,
+    members: getData()
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (data.learnerGroup || 'schedule') + '.txt';
+  a.click();
+}
 
-  function importProject(file){
-    const reader = new FileReader();
-    reader.onload = e => {
-      const data = JSON.parse(e.target.result);
+function importProject(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = JSON.parse(e.target.result);
 
-      membersEl.innerHTML = '';
-      lgInput.value = data.learnerGroup || '';
+    membersEl.innerHTML = '';
+    lgInput.value = data.learnerGroup || '';
 
-      if(data.logo){
-        lgLogoDataUrl = data.logo;
-        lgLogoMime = data.logoMime || 'PNG';
-      }
+    if(data.logo){
+      lgLogoDataUrl = data.logo;
+      lgLogoMime = data.logoMime || 'PNG';
+    }
 
-      (data.members || []).forEach(m => {
-        addMember();
-        const card = membersEl.lastElementChild;
+    (data.members || []).forEach(m => {
+      addMember();
+      const card = membersEl.lastElementChild;
 
-        card.querySelector('.member-name-input').value = m.fullName || '';
-        card.querySelector('.dept-input').value = m.dept || '';
-        card.querySelector('.position-input').value = m.position || '';
-        card.querySelector('.member-color').value = m.color || '#888888';
+      card.querySelector('.member-name-input').value = m.fullName || '';
+      card.querySelector('.dept-input').value = m.dept || '';
+      card.querySelector('.position-input').value = m.position || '';
+      card.querySelector('.member-color').value = m.color || '#888888';
 
-        card.querySelector('.classes').innerHTML='';
+      card.querySelector('.classes').innerHTML='';
 
-        (m.classes || []).forEach(c=>{
-          addClassEntry(card);
-          const wrap  = card.querySelector('.classes').lastElementChild;
-          const entry = wrap.querySelector('.class-entry');
-          entry.querySelector('.day').value = c.day;
-          entry.querySelector('.course-code').value = c.courseCode;
-          entry.querySelector('.room').value = c.room;
-          entry.querySelector('.start-time').value =
-            String(Math.floor(c.start/60)).padStart(2,'0') + ':' +
-            String(c.start%60).padStart(2,'0');
-          entry.querySelector('.end-time').value =
-            String(Math.floor(c.end/60)).padStart(2,'0') + ':' +
-            String(c.end%60).padStart(2,'0');
-        });
+      (m.classes || []).forEach(c=>{
+        addClassEntry(card);
+        const wrap  = card.querySelector('.classes').lastElementChild;
+        const entry = wrap.querySelector('.class-entry');
+        entry.querySelector('.day').value = c.day;
+        entry.querySelector('.course-code').value = c.courseCode;
+        entry.querySelector('.room').value = c.room;
+        entry.querySelector('.start-time').value =
+          String(Math.floor(c.start/60)).padStart(2,'0') + ':' +
+          String(c.start%60).padStart(2,'0');
+        entry.querySelector('.end-time').value =
+          String(Math.floor(c.end/60)).padStart(2,'0') + ':' +
+          String(c.end%60).padStart(2,'0');
+        entry.querySelector('.sync-mode').value = c.syncMode || 'sync';
       });
-
-      renderPreview();
-    };
-    reader.readAsText(file);
-  }
-
-
-    // ── INIT ──────────────────────────────────────────────────────────────────────
-
-    // Track unsaved changes
-    let unsavedChanges = false;
-    let savedOnce = false;  // becomes true after first save
-
-    function markUnsaved() { unsavedChanges = true; }
-    function markSaved()   { unsavedChanges = false; savedOnce = true; }
-
-    // Warn on page unload only when there's unsaved work
-    window.addEventListener('beforeunload', e => {
-      if (!unsavedChanges) return;
-      const msg = savedOnce
-        ? 'You have unsaved changes. Save your schedule first, or your changes will be lost.'
-        : 'Your schedule has not been saved. All entered data will be lost if you leave. Click "💾 Save Schedule" to save it first.';
-      e.preventDefault();
-      e.returnValue = msg;
-      return msg;
     });
 
-    // Patch exportProject to mark saved
-    const _origExport = exportProject;
-    exportProject = function() { _origExport(); markSaved(); };
-
-    // Patch importProject to clear unsaved flag (data just loaded = clean state)
-    const _origImport = importProject;
-    importProject = function(file) { _origImport(file); markSaved(); };
-
-    document.getElementById('add-member').addEventListener('click', () => { addMember(); renderPreview(); markUnsaved(); });
-    document.getElementById('generate-pdfs').addEventListener('click', generatePdfs);
-    document.getElementById('save-project').addEventListener('click', exportProject);
-    document.getElementById('load-project').addEventListener('click', ()=>document.getElementById('load-project-file').click());
-    document.getElementById('load-project-file').addEventListener('change', e=>{
-      if(e.target.files[0]) importProject(e.target.files[0]);
-    });
-    previewDayEl.addEventListener('change', renderPreview);
-    lgInput.addEventListener('input', () => { renderPreview(); markUnsaved(); });
-
-    // Also mark unsaved on any member input change (delegated)
-    membersEl.addEventListener('input', markUnsaved);
-    membersEl.addEventListener('click', e => {
-      if (e.target.closest('.remove-member, .remove-class, .add-class-btn')) markUnsaved();
-    });
-
-    for (let i = 0; i < 3; i++) addMember();
     renderPreview();
-  </script>
+  };
+  reader.readAsText(file);
+}
 
-  <footer>
-    Built by <a href="https://github.com/asm0git" target="_blank" rel="noopener">Aerith Catap</a>
-    &nbsp;·&nbsp; BS Computer Science &nbsp;·&nbsp;
-    <a href="https://github.com/asm0git" target="_blank" rel="noopener">@asm0git</a> on GitHub
-  </footer>
-  </body>
-  </html>
+
+  // ── INIT ──────────────────────────────────────────────────────────────────────
+
+  // Track unsaved changes
+  let unsavedChanges = false;
+  let savedOnce = false;  // becomes true after first save
+
+  function markUnsaved() { unsavedChanges = true; }
+  function markSaved()   { unsavedChanges = false; savedOnce = true; }
+
+  // Warn on page unload only when there's unsaved work
+  window.addEventListener('beforeunload', e => {
+    if (!unsavedChanges) return;
+    const msg = savedOnce
+      ? 'You have unsaved changes. Save your schedule first, or your changes will be lost.'
+      : 'Your schedule has not been saved. All entered data will be lost if you leave. Click "💾 Save Schedule" to save it first.';
+    e.preventDefault();
+    e.returnValue = msg;
+    return msg;
+  });
+
+  // Patch exportProject to mark saved
+  const _origExport = exportProject;
+  exportProject = function() { _origExport(); markSaved(); };
+
+  // Patch importProject to clear unsaved flag (data just loaded = clean state)
+  const _origImport = importProject;
+  importProject = function(file) { _origImport(file); markSaved(); };
+
+  document.getElementById('add-member').addEventListener('click', () => { addMember(); renderPreview(); markUnsaved(); });
+  document.getElementById('generate-pdfs').addEventListener('click', generatePdfs);
+  document.getElementById('save-project').addEventListener('click', exportProject);
+  document.getElementById('load-project').addEventListener('click', ()=>document.getElementById('load-project-file').click());
+  document.getElementById('load-project-file').addEventListener('change', e=>{
+    if(e.target.files[0]) importProject(e.target.files[0]);
+  });
+  previewDayEl.addEventListener('change', renderPreview);
+  lgInput.addEventListener('input', () => { renderPreview(); markUnsaved(); });
+
+  // Also mark unsaved on any member input change (delegated)
+  membersEl.addEventListener('input', markUnsaved);
+  membersEl.addEventListener('click', e => {
+    if (e.target.closest('.remove-member, .remove-class, .add-class-btn')) markUnsaved();
+  });
+
+  for (let i = 0; i < 3; i++) addMember();
+  renderPreview();
+</script>
+
+<footer>
+  Built by <a href="https://github.com/asm0git" target="_blank" rel="noopener">Aerith Catap</a>
+  &nbsp;·&nbsp; BS Computer Science &nbsp;·&nbsp;
+  <a href="https://github.com/asm0git" target="_blank" rel="noopener">@asm0git</a> on GitHub
+</footer>
+</body>
+</html>
