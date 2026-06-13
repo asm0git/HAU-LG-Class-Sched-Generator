@@ -71,6 +71,21 @@
     button.duplicate-member:hover, button.duplicate-class:hover {
       border-color:var(--accent); color:var(--accent); background:transparent;
     }
+    .collapse-toggle {
+      background:transparent; border:none; color:var(--text-muted);
+      cursor:pointer; padding:0.3rem; margin-left:auto;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; border-radius:6px;
+      transition:transform 0.15s, background 0.15s;
+    }
+    .collapse-toggle:hover { background:var(--surface2); border:none; }
+    .collapse-toggle svg { width:18px; height:18px; transition:transform 0.15s; }
+    .member-card.collapsed .collapse-toggle svg { transform:rotate(-90deg); }
+    .member-card.collapsed .member-header { margin-bottom:0; }
+    .member-card.collapsed .classes,
+    .member-card.collapsed .add-class-btn {
+      display:none;
+    }
     button.add-class-btn {
       background:transparent; border:1px dashed var(--border);
       color:var(--text-muted); font-size:0.8rem; font-weight:500;
@@ -338,6 +353,9 @@
       </div>
       <button class="duplicate-member" type="button">Duplicate member</button>
       <button class="remove-member" type="button">Remove member</button>
+      <button class="collapse-toggle" type="button" title="Collapse/Expand" aria-label="Collapse member">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
     </div>
     <div class="classes"></div>
     <button class="add-class-btn" type="button">+ Add Class</button>
@@ -588,7 +606,7 @@
         block.style.width = `${Math.max(width, 1.5)}%`;
 
         if (entry.syncMode === 'async') {
-          block.style.background = 'transparent';
+          block.style.background = member.color + '33'; // muted fill via alpha
           block.style.border     = `2px dashed ${member.color}`;
           block.style.color      = member.color;
         } else {
@@ -809,7 +827,11 @@
         const isAsync = entry.syncMode === 'async';
 
         if (isAsync) {
-          // Muted, dashed-outline block for asynchronous classes
+          // Muted fill + dashed outline for asynchronous classes
+          pdf.setFillColor(r,g,b);
+          pdf.setGState(new pdf.GState({opacity: 0.2}));
+          pdf.rect(bx, y + 2, Math.max(bw, 2), bh, 'F');
+          pdf.setGState(new pdf.GState({opacity: 1}));
           pdf.setDrawColor(r,g,b);
           pdf.setLineWidth(0.75);
           pdf.setLineDashPattern([2, 1.5], 0);
@@ -828,40 +850,58 @@
         const maxTextH  = bh - barPadY * 2;
         // Only attempt text if there's meaningful room
         if (maxTextW > 4 && maxTextH > 4) {
-          const label = barLabel(entry);
-          // Start from barFontSz, shrink until text fits width OR font hits floor
+          const codePart = `${entry.courseCode} `;
+          const roomPart = `(${entry.room})`;
+          const fullLabel = codePart + roomPart;
+          // Start from barFontSz, shrink until full text fits width OR font hits floor
           let fs = barFontSz;
           const minFs = 4;
-          pdf.setFont('helvetica','bold');
+          pdf.setFont('helvetica','normal');
           while (fs > minFs) {
             pdf.setFontSize(fs);
-            const lines = pdf.splitTextToSize(label, maxTextW);
+            const lines = pdf.splitTextToSize(fullLabel, maxTextW);
             const neededH = lines.length * fs * 1.15;
             if (neededH <= maxTextH) break;
             fs -= 0.5;
           }
           pdf.setFontSize(fs);
-          // Final split at chosen size — take only as many lines as fit
-          const lines     = pdf.splitTextToSize(label, maxTextW);
-          const lineH     = fs * 1.15;
-          const maxLines  = Math.max(1, Math.floor(maxTextH / lineH));
-          const visLines  = lines.slice(0, maxLines);
-          // If last visible line was truncated, add ellipsis
-          if (visLines.length < lines.length) {
-            let last = visLines[visLines.length - 1];
-            while (last.length > 1 && pdf.getTextWidth(last + '…') > maxTextW) {
-              last = last.slice(0, -1);
-            }
-            visLines[visLines.length - 1] = last + '…';
-          }
-          const blockH   = visLines.length * lineH;
-          const textTopB = y + 2 + (bh - blockH) / 2 + fs * 0.75;
-          // Text color: white on solid sync fill, member color on muted async outline
+          const lineH    = fs * 1.15;
+          const maxLines = Math.max(1, Math.floor(maxTextH / lineH));
+
+          // Only render a single line with two font weights (typical case).
+          // If it needs to wrap, fall back to plain wrapped text (no mixed weights).
+          pdf.setFont('helvetica','normal');
+          const singleLineFits = pdf.getTextWidth(fullLabel) <= maxTextW;
+
           if (isAsync) pdf.setTextColor(r,g,b);
           else         pdf.setTextColor(255,255,255);
-          visLines.forEach((line, li) => {
-            pdf.text(line, bx + barPadX, textTopB + li * lineH);
-          });
+
+          const textTopB = y + 2 + (bh - lineH) / 2 + fs * 0.75;
+
+          if (singleLineFits) {
+            pdf.setFont('helvetica','normal');
+            pdf.text(codePart, bx + barPadX, textTopB);
+            const codeW = pdf.getTextWidth(codePart);
+            pdf.setFont('helvetica','bold');
+            pdf.text(roomPart, bx + barPadX + codeW, textTopB);
+          } else {
+            // Wrap normally (non-bold) and add ellipsis if truncated
+            pdf.setFont('helvetica','normal');
+            const lines = pdf.splitTextToSize(fullLabel, maxTextW);
+            const visLines = lines.slice(0, maxLines);
+            if (visLines.length < lines.length) {
+              let last = visLines[visLines.length - 1];
+              while (last.length > 1 && pdf.getTextWidth(last + '…') > maxTextW) {
+                last = last.slice(0, -1);
+              }
+              visLines[visLines.length - 1] = last + '…';
+            }
+            const blockH = visLines.length * lineH;
+            const topB   = y + 2 + (bh - blockH) / 2 + fs * 0.75;
+            visLines.forEach((line, li) => {
+              pdf.text(line, bx + barPadX, topB + li * lineH);
+            });
+          }
         }
       });
     });
@@ -1056,6 +1096,9 @@
       const name = card.querySelector('.member-name-input').value.trim() || 'this member';
       if (!confirm(`Remove ${name}? This cannot be undone.`)) return;
       card.remove(); renderPreview();
+    });
+    card.querySelector('.collapse-toggle').addEventListener('click', () => {
+      card.classList.toggle('collapsed');
     });
     card.querySelector('.duplicate-member').addEventListener('click', () => {
       duplicateMember(card);
