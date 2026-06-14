@@ -909,6 +909,122 @@
       });
     });
 
+    // ── FREE-SLOT OVERLAY ────────────────────────────────────────────
+    // Compute occupied minutes across ALL members (not just this page chunk)
+    // so multi-page PDFs don't falsely show free slots for absent members.
+    // Resolution: track per-minute occupancy for accurate partial-slot detection.
+    const totalMins = END_MIN - START_MIN; // 875 minutes (7 AM – 9:30 PM)
+    const occupiedMin = new Uint8Array(totalMins);
+    allMembers.forEach(member => {
+      member.classes.filter(e => e.day === day).forEach(entry => {
+        const s = Math.max(0, entry.start - START_MIN);
+        const e2 = Math.min(totalMins, entry.end - START_MIN);
+        for (let m = s; m < e2; m++) occupiedMin[m] = 1;
+      });
+    });
+
+    // Merge contiguous free runs (in minutes), discard runs <= 10 minutes
+    const MIN_FREE_MINS = 10; // must be MORE than 10 min to show as free
+    const freeRuns = [];
+    let runStart = -1;
+    for (let m = 0; m <= totalMins; m++) {
+      const isFree = m < totalMins && !occupiedMin[m];
+      if (isFree && runStart === -1) { runStart = m; }
+      else if (!isFree && runStart !== -1) {
+        if (m - runStart > MIN_FREE_MINS) freeRuns.push([runStart, m]);
+        runStart = -1;
+      }
+    }
+
+    // Draw free-slot overlays (behind row dividers, above bg)
+    const gridH = actualGridBottom - gridTop;
+    freeRuns.forEach(([sMin, eMin]) => {
+      const fx = timelineX + (sMin / totalMins) * timelineW;
+      const fw = ((eMin - sMin) / totalMins) * timelineW;
+
+      // Light green fill spanning full grid height
+      pdf.setFillColor(220, 245, 220);
+      pdf.rect(fx, gridTop, fw, gridH, 'F');
+
+      // Vertical centred label: "Free" on line 1, time range on line 2
+      // Text is rotated 90° and centred vertically in the band.
+      // Only draw if the band is wide enough to be legible at all.
+      const startM  = START_MIN + sMin;
+      const endM    = START_MIN + eMin;
+      const line1   = 'Free';
+      const line2   = `${fmtFull(startM)}–${fmtFull(endM)}`;
+
+      // Pick a font size that fits within the band width when rotated
+      // (rotated text height = text width; rotated text width = text height)
+      // We want the combined "height" of both lines (which becomes width when rotated)
+      // to fit within fw - 4pt padding.
+      const MAX_LABEL_FS = 8;
+      const MIN_LABEL_FS = 4;
+      let labelFs = MAX_LABEL_FS;
+      let line1W, line2W;
+      for (; labelFs >= MIN_LABEL_FS; labelFs -= 0.5) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(labelFs);
+        line1W = pdf.getTextWidth(line1);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(labelFs * 0.88);
+        line2W = pdf.getTextWidth(line2);
+        // When rotated, "width" of text becomes the vertical space it needs.
+        // Both lines sit side-by-side rotated; total rotated height = line1W + gap + line2W
+        // But we need that <= fw - 4.
+        const rotatedSpan = line1W + labelFs * 1.2 + line2W; // combined horizontal span after rotation
+        if (rotatedSpan <= fw - 4) break;
+      }
+      if (labelFs < MIN_LABEL_FS) labelFs = MIN_LABEL_FS;
+
+      // Re-measure at chosen size
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(labelFs);
+      line1W = pdf.getTextWidth(line1);
+      const line2Fs = labelFs * 0.88;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(line2Fs);
+      line2W = pdf.getTextWidth(line2);
+
+      // Vertical centre of the grid band
+      const bandCenterY = gridTop + gridH / 2;
+      // Horizontal centre of the free band (= vertical anchor when rotated)
+      const bandCenterX = fx + fw / 2;
+
+      // Total height of both text lines when rendered horizontally
+      // (= total width occupied when rotated 90°)
+      const lineGap    = labelFs * 0.3;
+      const totalSpan  = line1W + lineGap + line2W;
+
+      // Draw line1 ("Free") rotated 90° counter-clockwise, centred in the band
+      // jsPDF angle is counter-clockwise. anchor: baseline of text.
+      // When rotated +90, text reads bottom-to-top.
+      // Position: x = bandCenterX, y = bandCenterY + half of totalSpan
+      const line1StartY = bandCenterY + totalSpan / 2;
+      const line2StartY = line1StartY - line1W - lineGap;
+
+      // Only draw if both lines fit vertically in the grid
+      if (totalSpan <= gridH - 4 && fw >= 6) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(labelFs);
+        pdf.setTextColor(80, 160, 80);
+        pdf.text(line1, bandCenterX, line1StartY, { angle: 90 });
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(line2Fs);
+        pdf.setTextColor(100, 170, 100);
+        pdf.text(line2, bandCenterX, line2StartY, { angle: 90 });
+      }
+    });
+
+    // Redraw row dividers on top of the free overlay so they stay crisp
+    members.forEach((member, idx) => {
+      const y = gridTop + idx * rowH;
+      pdf.setDrawColor(220,220,220);
+      pdf.setLineWidth(0.2);
+      pdf.line(timelineX, y + rowH, PW - margin, y + rowH);
+    });
+
     pdf.setDrawColor(180,180,180);
     pdf.setLineWidth(0.4);
     pdf.line(timelineX, margin + headerH, timelineX, actualGridBottom);
