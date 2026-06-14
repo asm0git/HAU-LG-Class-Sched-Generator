@@ -353,14 +353,15 @@
 
 <script>
   const DAYS        = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const START_MIN   = 6 * 60;
+  const VALID_START = 6 * 60;   // validation still starts at 6 AM
+  const START_MIN   = 7 * 60;   // timeline/grid display starts at 7 AM
   const END_MIN     = 21 * 60 + 30;
   const TOTAL_SLOTS = (END_MIN - START_MIN) / 15;
-  const MAX_ROWS_PER_PAGE = 30;
+  const MAX_ROWS_PER_PAGE = 20;  // changed from 30
   const BAR_PAD_X = 2.5;
   const BAR_PAD_Y = 2;
   const MIN_BAR_FS = 4.5;
-  const GAP_RATIO  = 0.3;
+  const GAP_RATIO  = 0.25;
 
   const membersEl    = document.getElementById('members');
   const previewDayEl = document.getElementById('preview-day');
@@ -428,12 +429,13 @@
         const wrap = entry.closest('.class-entry-wrap') || entry;
         wrap.querySelector('.class-error')?.remove();
         let err = null;
+        // Validation still uses VALID_START (6 AM)
         if (rawStart === null || rawEnd === null) {
           err = 'Missing time.';
-        } else if (rawStart < START_MIN || rawStart > END_MIN) {
+        } else if (rawStart < VALID_START || rawStart > END_MIN) {
           err = `Start must be between 6:00 AM and 9:30 PM.`;
           startEl.style.borderColor = '#cc3333';
-        } else if (rawEnd < START_MIN || rawEnd > END_MIN) {
+        } else if (rawEnd < VALID_START || rawEnd > END_MIN) {
           err = `End must be between 6:00 AM and 9:30 PM.`;
           endEl.style.borderColor = '#cc3333';
         } else if (rawEnd <= rawStart) {
@@ -483,7 +485,7 @@
         const rawEnd     = parseTime(entry.querySelector('.end-time').value);
         const syncMode   = entry.querySelector('.sync-mode').value;
         if (rawStart === null || rawEnd === null) return;
-        if (rawStart < START_MIN || rawEnd > END_MIN) return;
+        if (rawStart < VALID_START || rawEnd > END_MIN) return;
         if (rawEnd <= rawStart) return;
         classes.push({ day, courseCode: courseCode||'—', room: room||'—', start: rawStart, end: rawEnd, syncMode });
       });
@@ -512,6 +514,7 @@
     hdr.append(hName);
     const hTime = document.createElement('div');
     hTime.className = 'preview-time header-time';
+    // Preview timeline: START_MIN = 7 AM
     for (let m = START_MIN; m <= END_MIN; m += 60) {
       const lbl = document.createElement('span');
       lbl.className = 'preview-slot-label';
@@ -539,10 +542,14 @@
       const timeline = document.createElement('div');
       timeline.className = 'preview-time';
       member.classes.filter(c => c.day === day).forEach(entry => {
+        // Clamp visually to display timeline (7 AM start)
+        const dispStart = Math.max(entry.start, START_MIN);
+        const dispEnd   = Math.min(entry.end, END_MIN);
+        if (dispEnd <= dispStart) return; // fully before 7 AM, skip in preview
         const block = document.createElement('div');
         block.className = 'preview-block';
-        const left  = ((entry.start - START_MIN) / (END_MIN - START_MIN)) * 100;
-        const width = ((entry.end - entry.start) / (END_MIN - START_MIN)) * 100;
+        const left  = ((dispStart - START_MIN) / (END_MIN - START_MIN)) * 100;
+        const width = ((dispEnd - dispStart) / (END_MIN - START_MIN)) * 100;
         block.style.left  = `${left}%`;
         block.style.width = `${Math.max(width, 1.5)}%`;
         if (entry.syncMode === 'async') {
@@ -656,6 +663,7 @@
     pdf.setFontSize(timeLabelFontSz);
     pdf.setTextColor(140,140,140);
     pdf.setDrawColor(210,210,210);
+    // Grid lines & labels: START_MIN = 7 AM
     for (let i = 0; i <= TOTAL_SLOTS; i++) {
       const x = timelineX + (i / TOTAL_SLOTS) * timelineW;
       if      (i % 4 === 0) pdf.setLineWidth(0.5);
@@ -746,12 +754,18 @@
     });
 
     const globalRoomFs = globalBarFs * 0.88;
+    const globalTimeFs = globalBarFs * 0.80;
 
     members.forEach((member, idx) => {
       const y = gridTop + idx * rowH;
       member.classes.filter(e => e.day === day).forEach(entry => {
-        const bx = timelineX + ((entry.start - START_MIN) / (END_MIN - START_MIN)) * timelineW;
-        const bw = ((entry.end - entry.start) / (END_MIN - START_MIN)) * timelineW;
+        // Clamp bar to display timeline (7 AM)
+        const dispStart = Math.max(entry.start, START_MIN);
+        const dispEnd   = Math.min(entry.end, END_MIN);
+        if (dispEnd <= dispStart) return;
+
+        const bx = timelineX + ((dispStart - START_MIN) / (END_MIN - START_MIN)) * timelineW;
+        const bw = ((dispEnd - dispStart) / (END_MIN - START_MIN)) * timelineW;
         const bh = Math.max(rowH - 4, 4);
         const [r,g,b] = hexToRgb(member.color || '#888888');
         const isAsync = entry.syncMode === 'async';
@@ -775,35 +789,123 @@
 
         const codePart = entry.courseCode;
         const roomPart = `(${entry.room})`;
+        const timePart = `${fmtFull(entry.start)}–${fmtFull(entry.end)}`;
 
+        // ── Per-bar font sizing: find the largest fs where everything fits ──
+        // We try to fit: code (bold) + room (italic, 0.88x) + time (normal, 0.80x)
+        // Graceful degradation: if even MIN_BAR_FS can't fit all 3, drop time,
+        // then drop room, then just render code.
+        let barFs = globalBarFs;
+
+        // Helper: compute layout at a given fs. Returns null if doesn't fit.
+        function tryLayout(fs, includeRoom, includeTime) {
+          const rFs = fs * 0.88;
+          const tFs = fs * 0.80;
+          const gap = fs * GAP_RATIO;
+
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(fs);
+          const cl = splitWithHyphenation(pdf, codePart, maxTextW);
+          const cH = cl.length * (fs * 1.1);
+
+          let totalH = cH;
+          if (includeRoom) {
+            pdf.setFont('helvetica', 'italic');
+            pdf.setFontSize(rFs);
+            if (pdf.getTextWidth(roomPart) > maxTextW) return null;
+            totalH += gap + rFs * 1.1;
+          }
+          if (includeTime) {
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(tFs);
+            if (pdf.getTextWidth(timePart) > maxTextW) return null;
+            totalH += gap * 0.6 + tFs * 1.1;
+          }
+          if (totalH > maxTextH) return null;
+          return { cl, cH, totalH };
+        }
+
+        // Find best fs for all 3 lines
+        let layout = null;
+        let includeRoom = true, includeTime = true;
+        for (let fs = barFs; fs >= MIN_BAR_FS; fs -= 0.5) {
+          layout = tryLayout(fs, true, true);
+          if (layout) { barFs = fs; break; }
+        }
+        // If can't fit 3 lines, try code+room only
+        if (!layout) {
+          includeTime = false;
+          for (let fs = globalBarFs; fs >= MIN_BAR_FS; fs -= 0.5) {
+            layout = tryLayout(fs, true, false);
+            if (layout) { barFs = fs; break; }
+          }
+        }
+        // If still no fit, try code only
+        if (!layout) {
+          includeRoom = false;
+          includeTime = false;
+          for (let fs = globalBarFs; fs >= MIN_BAR_FS; fs -= 0.5) {
+            layout = tryLayout(fs, false, false);
+            if (layout) { barFs = fs; break; }
+          }
+        }
+        // Last resort: code at MIN_BAR_FS, clipped
+        if (!layout) {
+          barFs = MIN_BAR_FS;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(barFs);
+          layout = {
+            cl: splitWithHyphenation(pdf, codePart, maxTextW),
+            cH: MIN_BAR_FS * 1.1,
+            totalH: MIN_BAR_FS * 1.1
+          };
+          includeRoom = false; includeTime = false;
+        }
+
+        const barRoomFs = barFs * 0.88;
+        const barTimeFs = barFs * 0.80;
+        const barGap    = barFs * GAP_RATIO;
+        const { cl: codeLines, cH: codeBlockH, totalH } = layout;
+
+        // Vertically center — clamp so text never starts above the bar top
+        const barInnerTop = y + 2 + BAR_PAD_Y;
+        const blockTopY   = Math.max(barInnerTop, y + 2 + (bh - totalH) / 2);
+
+        // Draw course code (bold)
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(globalBarFs);
-        const codeLines  = splitWithHyphenation(pdf, codePart, maxTextW);
-        const codeLineH  = globalBarFs * 1.1;
-        const codeBlockH = codeLines.length * codeLineH;
-        const gapPt      = globalBarFs * GAP_RATIO;
-        const totalH     = codeBlockH + gapPt + globalRoomFs * 1.1;
-
-        const blockTopY  = y + 2 + Math.max(0, (bh - totalH) / 2);
-        const codeStartY = blockTopY + globalBarFs * 0.82;
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(globalBarFs);
+        pdf.setFontSize(barFs);
         if (isAsync) pdf.setTextColor(r, g, b);
         else         pdf.setTextColor(255, 255, 255);
+        const codeStartY = blockTopY + barFs * 0.82;
         codeLines.forEach((line, li) => {
-          pdf.text(line, bx + BAR_PAD_X, codeStartY + li * codeLineH);
+          pdf.text(line, bx + BAR_PAD_X, codeStartY + li * (barFs * 1.1));
         });
 
-        const roomBaseY = blockTopY + codeBlockH + gapPt + globalRoomFs * 0.82;
-        pdf.setFont('helvetica', 'italic');
-        pdf.setFontSize(globalRoomFs);
-        if (isAsync) {
-          pdf.setTextColor(Math.min(255, r + 40), Math.min(255, g + 40), Math.min(255, b + 40));
-        } else {
-          pdf.setTextColor(235, 235, 235);
+        // Draw room (italic)
+        if (includeRoom) {
+          const roomBaseY = blockTopY + codeBlockH + barGap + barRoomFs * 0.82;
+          pdf.setFont('helvetica', 'italic');
+          pdf.setFontSize(barRoomFs);
+          if (isAsync) {
+            pdf.setTextColor(Math.min(255, r + 40), Math.min(255, g + 40), Math.min(255, b + 40));
+          } else {
+            pdf.setTextColor(235, 235, 235);
+          }
+          pdf.text(roomPart, bx + BAR_PAD_X, roomBaseY);
+
+          // Draw time range (normal)
+          if (includeTime) {
+            const timeBaseY = blockTopY + codeBlockH + barGap + barRoomFs * 1.1 + barGap * 0.6 + barTimeFs * 0.82;
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(barTimeFs);
+            if (isAsync) {
+              pdf.setTextColor(Math.min(255, r + 60), Math.min(255, g + 60), Math.min(255, b + 60));
+            } else {
+              pdf.setTextColor(220, 220, 220);
+            }
+            pdf.text(timePart, bx + BAR_PAD_X, timeBaseY);
+          }
         }
-        pdf.text(roomPart, bx + BAR_PAD_X, roomBaseY);
       });
     });
 
@@ -897,30 +999,47 @@
     members.forEach(member => {
       daysToCheck.forEach(day => {
         member.classes.filter(e => e.day === day).forEach(entry => {
-          const bw       = ((entry.end - entry.start) / (END_MIN - START_MIN)) * timelineW;
+          // Use display-clamped width
+          const dispStart = Math.max(entry.start, START_MIN);
+          const dispEnd   = Math.min(entry.end, END_MIN);
+          if (dispEnd <= dispStart) return;
+          const bw       = ((dispEnd - dispStart) / (END_MIN - START_MIN)) * timelineW;
           const maxTextW = bw - BAR_PAD_X * 2;
           const maxTextH = bh - BAR_PAD_Y * 2;
           if (maxTextW < 5 || maxTextH < 6) return;
 
           const codePart = entry.courseCode;
           const roomPart = `(${entry.room})`;
+          const timePart = `${fmtFull(entry.start)}–${fmtFull(entry.end)}`;
 
-          let fs = globalFs;
-          while (fs >= MIN_BAR_FS) {
-            const roomFs = fs * 0.88;
-            pdf.setFont('helvetica','italic');
-            pdf.setFontSize(roomFs);
-            if (pdf.getTextWidth(roomPart) > maxTextW) { fs -= 0.5; continue; }
-
-            pdf.setFont('helvetica','bold');
-            pdf.setFontSize(fs);
-            const codeLines  = splitWithHyphenation(pdf, codePart, maxTextW);
-            const codeBlockH = codeLines.length * (fs * 1.1);
-            const totalH     = codeBlockH + fs * GAP_RATIO + roomFs * 1.1;
-            if (totalH <= maxTextH) break;
-            fs -= 0.5;
+          // Mirror per-bar degradation: code+room+time, then code+room, then code-only.
+          let bestFs = MIN_BAR_FS;
+          outerLoop: for (const [tryRoom, tryTime] of [[true,true],[true,false],[false,false]]) {
+            for (let fs = globalFs; fs >= MIN_BAR_FS; fs -= 0.5) {
+              const rFs = fs * 0.88;
+              const tFs = fs * 0.80;
+              const gap = fs * GAP_RATIO;
+              pdf.setFont('helvetica', 'bold');
+              pdf.setFontSize(fs);
+              const cl = splitWithHyphenation(pdf, codePart, maxTextW);
+              const cH = cl.length * (fs * 1.1);
+              let totalH = cH;
+              if (tryRoom) {
+                pdf.setFont('helvetica','italic');
+                pdf.setFontSize(rFs);
+                if (pdf.getTextWidth(roomPart) > maxTextW) continue;
+                totalH += gap + rFs * 1.1;
+              }
+              if (tryTime) {
+                pdf.setFont('helvetica','normal');
+                pdf.setFontSize(tFs);
+                if (pdf.getTextWidth(timePart) > maxTextW) continue;
+                totalH += gap * 0.6 + tFs * 1.1;
+              }
+              if (totalH <= maxTextH) { bestFs = fs; break outerLoop; }
+            }
           }
-          globalFs = Math.min(globalFs, Math.max(fs, MIN_BAR_FS));
+          globalFs = Math.min(globalFs, bestFs);
         });
       });
     });
@@ -978,7 +1097,7 @@
     const tpl   = document.getElementById('class-template');
     const entry = tpl.content.firstElementChild.cloneNode(true);
     fillDaySelect(entry.querySelector('.day'));
-    entry.querySelector('.start-time').value = '06:00';
+    entry.querySelector('.start-time').value = '07:00';
     entry.querySelector('.end-time').value   = '09:00';
     entry.querySelector('.sync-mode').value  = 'sync';
     const wrap = document.createElement('div');
@@ -1038,15 +1157,12 @@
     card.querySelector('.duplicate-member').addEventListener('click', () => { duplicateMember(card); renderPreview(); markUnsaved(); });
     card.querySelector('.add-class-btn').addEventListener('click', () => { addClassEntry(card); renderPreview(); markUnsaved(); });
 
-    // Wire name/dept/position inputs
     card.querySelectorAll('.member-name-input, .dept-input, .position-input')
         .forEach(el => el.addEventListener('input', renderPreview));
 
-    // ── Color picker ↔ hex text input sync ──────────────────────────────
     const colorPicker = card.querySelector('.member-color');
     const colorHex    = card.querySelector('.member-color-hex');
 
-    // Picker → hex input
     colorPicker.addEventListener('input', () => {
       colorHex.value = colorPicker.value.toUpperCase();
       colorHex.classList.remove('hex-invalid');
@@ -1054,10 +1170,8 @@
       markUnsaved();
     });
 
-    // Hex input → picker (validate on every keystroke, sync only when complete)
     colorHex.addEventListener('input', () => {
       let val = colorHex.value.trim();
-      // Auto-prepend '#' if user typed without it
       if (val && !val.startsWith('#')) val = '#' + val;
       if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
         colorPicker.value = val;
@@ -1070,7 +1184,6 @@
       markUnsaved();
     });
 
-    // On blur: if invalid, snap back to the picker's current value
     colorHex.addEventListener('blur', () => {
       const val = colorHex.value.trim();
       if (!/^#[0-9A-Fa-f]{6}$/i.test(val)) {
