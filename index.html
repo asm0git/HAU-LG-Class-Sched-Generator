@@ -215,7 +215,7 @@
       border-radius:8px; overflow:auto; max-height:72vh;
     }
     .preview-grid { width:100%; }
-    .preview-header, .preview-row { display:grid; grid-template-columns:180px 1fr; }
+    .preview-header, .preview-row { display:grid; grid-template-columns:120px 1fr; }
     .preview-row { height:38px; }
     .preview-name {
       border-right:1px solid var(--border); border-bottom:1px solid var(--border-light);
@@ -223,7 +223,7 @@
       display:flex; flex-direction:column; justify-content:center;
       overflow:hidden; height:100%;
     }
-    .preview-name span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .preview-name span { white-space:normal; overflow:hidden; text-overflow:ellipsis; word-break:break-word; line-height:1.2; }
     .preview-time {
       position:relative; border-bottom:1px solid var(--border-light); height:100%;
       background-image:repeating-linear-gradient(
@@ -353,15 +353,15 @@
 
 <script>
   const DAYS        = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const VALID_START = 6 * 60;   // validation still starts at 6 AM
-  const START_MIN   = 7 * 60;   // timeline/grid display starts at 7 AM
+  const VALIDATE_START_MIN = 6 * 60;   // 6:00 AM — validation boundary (unchanged)
+  const START_MIN   = 7 * 60;          // 7:00 AM — visual/PDF timeline start
   const END_MIN     = 21 * 60 + 30;
   const TOTAL_SLOTS = (END_MIN - START_MIN) / 15;
-  const MAX_ROWS_PER_PAGE = 20;  // changed from 30
+  const MAX_ROWS_PER_PAGE = 20;         // was 30
   const BAR_PAD_X = 2.5;
   const BAR_PAD_Y = 2;
   const MIN_BAR_FS = 4.5;
-  const GAP_RATIO  = 0.25;
+  const GAP_RATIO  = 0.3;
 
   const membersEl    = document.getElementById('members');
   const previewDayEl = document.getElementById('preview-day');
@@ -429,13 +429,12 @@
         const wrap = entry.closest('.class-entry-wrap') || entry;
         wrap.querySelector('.class-error')?.remove();
         let err = null;
-        // Validation still uses VALID_START (6 AM)
         if (rawStart === null || rawEnd === null) {
           err = 'Missing time.';
-        } else if (rawStart < VALID_START || rawStart > END_MIN) {
+        } else if (rawStart < VALIDATE_START_MIN || rawStart > END_MIN) {
           err = `Start must be between 6:00 AM and 9:30 PM.`;
           startEl.style.borderColor = '#cc3333';
-        } else if (rawEnd < VALID_START || rawEnd > END_MIN) {
+        } else if (rawEnd < VALIDATE_START_MIN || rawEnd > END_MIN) {
           err = `End must be between 6:00 AM and 9:30 PM.`;
           endEl.style.borderColor = '#cc3333';
         } else if (rawEnd <= rawStart) {
@@ -485,7 +484,7 @@
         const rawEnd     = parseTime(entry.querySelector('.end-time').value);
         const syncMode   = entry.querySelector('.sync-mode').value;
         if (rawStart === null || rawEnd === null) return;
-        if (rawStart < VALID_START || rawEnd > END_MIN) return;
+        if (rawStart < VALIDATE_START_MIN || rawEnd > END_MIN) return;
         if (rawEnd <= rawStart) return;
         classes.push({ day, courseCode: courseCode||'—', room: room||'—', start: rawStart, end: rawEnd, syncMode });
       });
@@ -514,7 +513,6 @@
     hdr.append(hName);
     const hTime = document.createElement('div');
     hTime.className = 'preview-time header-time';
-    // Preview timeline: START_MIN = 7 AM
     for (let m = START_MIN; m <= END_MIN; m += 60) {
       const lbl = document.createElement('span');
       lbl.className = 'preview-slot-label';
@@ -542,12 +540,11 @@
       const timeline = document.createElement('div');
       timeline.className = 'preview-time';
       member.classes.filter(c => c.day === day).forEach(entry => {
-        // Clamp visually to display timeline (7 AM start)
-        const dispStart = Math.max(entry.start, START_MIN);
-        const dispEnd   = Math.min(entry.end, END_MIN);
-        if (dispEnd <= dispStart) return; // fully before 7 AM, skip in preview
         const block = document.createElement('div');
         block.className = 'preview-block';
+        // Clamp display: classes before 7 AM still show but anchored at left edge
+        const dispStart = Math.max(entry.start, START_MIN);
+        const dispEnd   = Math.min(entry.end, END_MIN);
         const left  = ((dispStart - START_MIN) / (END_MIN - START_MIN)) * 100;
         const width = ((dispEnd - dispStart) / (END_MIN - START_MIN)) * 100;
         block.style.left  = `${left}%`;
@@ -604,19 +601,15 @@
     const rowCount      = Math.min(allMembers.length, MAX_ROWS_PER_PAGE) || 1;
     const rowH          = Math.max(14, rowsHEst / rowCount);
 
-    const nameFontSz      = Math.min(14, Math.max(8,  rowH * 0.45));
-    const posFontSz       = Math.min(10, Math.max(6,  rowH * 0.32));
+    // Name column is fixed-width so the timeline gets maximum space for class bars.
+    // Names wrap within this budget; font size is scaled down to fit vertically if needed.
+    const NAME_COL_W    = 120;                                   // fixed pt – narrower = more bar space
+    const nameFontSz    = Math.min(10, Math.max(6,  rowH * 0.38)); // reduced cap: was 14/8
+    const posFontSz     = Math.min(8,  Math.max(5,  rowH * 0.28)); // reduced cap: was 10/6
     const timeLabelFontSz = 6;
     const headerFontSz    = 10;
 
-    pdf.setFont('helvetica','bold');
-    pdf.setFontSize(nameFontSz);
-    let longestWidth = 0;
-    allMembers.forEach(member => {
-      const label = member.dept ? `${member.fullName} (${member.dept})` : member.fullName;
-      longestWidth = Math.max(longestWidth, pdf.getTextWidth(label));
-    });
-    const nameColW  = Math.min(Math.max(longestWidth + 16, 80), 260);
+    const nameColW  = NAME_COL_W;
     const timelineX = margin + nameColW;
     const timelineW = PW - margin - timelineX;
     const gridTop   = gridTopEst;
@@ -663,7 +656,6 @@
     pdf.setFontSize(timeLabelFontSz);
     pdf.setTextColor(140,140,140);
     pdf.setDrawColor(210,210,210);
-    // Grid lines & labels: START_MIN = 7 AM
     for (let i = 0; i <= TOTAL_SLOTS; i++) {
       const x = timelineX + (i / TOTAL_SLOTS) * timelineW;
       if      (i % 4 === 0) pdf.setLineWidth(0.5);
@@ -691,79 +683,68 @@
       pdf.line(margin, y + rowH, PW - margin, y + rowH);
 
       const hasPos    = !!member.position;
-      const nameLabel = member.dept ? `${member.fullName} (${member.dept})` : member.fullName;
+      // With a narrow fixed name column, always render dept on its own line below the name
+      // for clarity. Scale the whole block down if needed to fit the row height.
       pdf.setFont('helvetica','bold');
       pdf.setFontSize(nameFontSz);
-      const nameLines  = pdf.splitTextToSize(nameLabel, nameColW - 4);
-      const nameLineH  = nameFontSz * 1.15;
-      const posLineH   = posFontSz  * 1.15;
+      const nameOnly   = member.fullName;
+      const nameLines  = pdf.splitTextToSize(nameOnly, nameColW - 4);
+      const nameLineH  = nameFontSz * 1.2;
+      const posLineH   = posFontSz  * 1.2;
+      const deptLineH  = nameFontSz * 0.9 * 1.2;
       const gap        = 0.5;
-      const nameBlockH = nameLines.length * nameLineH;
-      const textBlockH = hasPos ? nameBlockH + gap + posLineH : nameBlockH;
-      const scale      = textBlockH > rowH - 4 ? (rowH - 4) / textBlockH : 1;
-      const drawNameSz = nameFontSz * scale;
-      const drawPosSz  = posFontSz  * scale;
-      const drawNameLH = nameLineH  * scale;
-      const drawGap    = gap        * scale;
-      const drawBlockH = textBlockH * scale;
+
+      // Count total lines: name lines + optional dept line + optional position line
+      const hasDept    = !!member.dept;
+      let totalLineH   = nameLines.length * nameLineH;
+      if (hasDept)  totalLineH += deptLineH;
+      if (hasPos)   totalLineH += gap + posLineH;
+
+      const scale      = totalLineH > rowH - 4 ? (rowH - 4) / totalLineH : 1;
+      const drawNameSz = nameFontSz       * scale;
+      const drawDeptSz = nameFontSz * 0.9 * scale;
+      const drawPosSz  = posFontSz        * scale;
+      const drawNameLH = nameLineH        * scale;
+      const drawDeptLH = deptLineH        * scale;
+      const drawGap    = gap              * scale;
+      const drawBlockH = totalLineH       * scale;
       const textTopY   = y + (rowH - drawBlockH) / 2 + drawNameSz * 0.75;
 
+      // Draw name lines (bold)
       pdf.setTextColor(20,20,20);
+      pdf.setFont('helvetica','bold');
       pdf.setFontSize(drawNameSz);
+      nameLines.forEach((line, li) => pdf.text(line, margin + 2, textTopY + li * drawNameLH));
 
-      let nameLineCount = 1;
+      let nextY = textTopY + nameLines.length * drawNameLH;
 
-      if (member.dept) {
-        const nameOnly = member.fullName;
-        const deptText = ` (${member.dept})`;
-        pdf.setFont('helvetica','bold');
-        const nameOnlyW = pdf.getTextWidth(nameOnly);
+      // Draw dept on its own line (normal, slightly smaller)
+      if (hasDept) {
         pdf.setFont('helvetica','normal');
-        const deptW = pdf.getTextWidth(deptText);
-
-        if (nameOnlyW + deptW <= nameColW - 4) {
-          pdf.setFont('helvetica','bold');
-          pdf.text(nameOnly, margin + 2, textTopY);
-          pdf.setFont('helvetica','normal');
-          pdf.text(deptText, margin + 2 + nameOnlyW, textTopY);
-          nameLineCount = 1;
-        } else {
-          pdf.setFont('helvetica','bold');
-          const nameWrapped = pdf.splitTextToSize(nameOnly, nameColW - 4);
-          nameWrapped.forEach((line, li) => pdf.text(line, margin + 2, textTopY + li * drawNameLH));
-          pdf.setFont('helvetica','normal');
-          pdf.setFontSize(drawNameSz * 0.9);
-          pdf.text(deptText.trim(), margin + 2, textTopY + nameWrapped.length * drawNameLH);
-          pdf.setFontSize(drawNameSz);
-          nameLineCount = nameWrapped.length + 1;
-        }
-      } else {
-        pdf.setFont('helvetica','bold');
-        const nameLines2 = pdf.splitTextToSize(member.fullName, nameColW - 4);
-        nameLines2.forEach((line, li) => pdf.text(line, margin + 2, textTopY + li * drawNameLH));
-        nameLineCount = nameLines2.length;
+        pdf.setFontSize(drawDeptSz);
+        pdf.setTextColor(80, 80, 80);
+        pdf.text(`(${member.dept})`, margin + 2, nextY, { maxWidth: nameColW - 4 });
+        nextY += drawDeptLH;
       }
 
+      // Draw position (italic, muted)
       if (hasPos) {
         pdf.setTextColor(110,110,110);
         pdf.setFont('helvetica','italic');
         pdf.setFontSize(drawPosSz);
-        const posY = textTopY + nameLineCount * drawNameLH + drawGap;
-        pdf.text(member.position, margin + 2, posY, { maxWidth: nameColW - 4 });
+        pdf.text(member.position, margin + 2, nextY + drawGap, { maxWidth: nameColW - 4 });
       }
     });
 
     const globalRoomFs = globalBarFs * 0.88;
-    const globalTimeFs = globalBarFs * 0.80;
+    const globalTimeFs = globalBarFs * 0.78;  // time label slightly smaller than room
 
     members.forEach((member, idx) => {
       const y = gridTop + idx * rowH;
       member.classes.filter(e => e.day === day).forEach(entry => {
-        // Clamp bar to display timeline (7 AM)
+        // Clamp bar to visible timeline (7 AM start)
         const dispStart = Math.max(entry.start, START_MIN);
         const dispEnd   = Math.min(entry.end, END_MIN);
-        if (dispEnd <= dispStart) return;
-
         const bx = timelineX + ((dispStart - START_MIN) / (END_MIN - START_MIN)) * timelineW;
         const bw = ((dispEnd - dispStart) / (END_MIN - START_MIN)) * timelineW;
         const bh = Math.max(rowH - 4, 4);
@@ -791,101 +772,53 @@
         const roomPart = `(${entry.room})`;
         const timePart = `${fmtFull(entry.start)}–${fmtFull(entry.end)}`;
 
-        // ── Per-bar font sizing: find the largest fs where everything fits ──
-        // We try to fit: code (bold) + room (italic, 0.88x) + time (normal, 0.80x)
-        // Graceful degradation: if even MIN_BAR_FS can't fit all 3, drop time,
-        // then drop room, then just render code.
-        let barFs = globalBarFs;
-
-        // Helper: compute layout at a given fs. Returns null if doesn't fit.
-        function tryLayout(fs, includeRoom, includeTime) {
-          const rFs = fs * 0.88;
-          const tFs = fs * 0.80;
-          const gap = fs * GAP_RATIO;
-
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(fs);
-          const cl = splitWithHyphenation(pdf, codePart, maxTextW);
-          const cH = cl.length * (fs * 1.1);
-
-          let totalH = cH;
-          if (includeRoom) {
-            pdf.setFont('helvetica', 'italic');
-            pdf.setFontSize(rFs);
-            if (pdf.getTextWidth(roomPart) > maxTextW) return null;
-            totalH += gap + rFs * 1.1;
-          }
-          if (includeTime) {
-            pdf.setFont('helvetica', 'normal');
-            pdf.setFontSize(tFs);
-            if (pdf.getTextWidth(timePart) > maxTextW) return null;
-            totalH += gap * 0.6 + tFs * 1.1;
-          }
-          if (totalH > maxTextH) return null;
-          return { cl, cH, totalH };
-        }
-
-        // Find best fs for all 3 lines
-        let layout = null;
-        let includeRoom = true, includeTime = true;
-        for (let fs = barFs; fs >= MIN_BAR_FS; fs -= 0.5) {
-          layout = tryLayout(fs, true, true);
-          if (layout) { barFs = fs; break; }
-        }
-        // If can't fit 3 lines, try code+room only
-        if (!layout) {
-          includeTime = false;
-          for (let fs = globalBarFs; fs >= MIN_BAR_FS; fs -= 0.5) {
-            layout = tryLayout(fs, true, false);
-            if (layout) { barFs = fs; break; }
-          }
-        }
-        // If still no fit, try code only
-        if (!layout) {
-          includeRoom = false;
-          includeTime = false;
-          for (let fs = globalBarFs; fs >= MIN_BAR_FS; fs -= 0.5) {
-            layout = tryLayout(fs, false, false);
-            if (layout) { barFs = fs; break; }
-          }
-        }
-        // Last resort: code at MIN_BAR_FS, clipped
-        if (!layout) {
-          barFs = MIN_BAR_FS;
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(barFs);
-          layout = {
-            cl: splitWithHyphenation(pdf, codePart, maxTextW),
-            cH: MIN_BAR_FS * 1.1,
-            totalH: MIN_BAR_FS * 1.1
-          };
-          includeRoom = false; includeTime = false;
-        }
-
-        const barRoomFs = barFs * 0.88;
-        const barTimeFs = barFs * 0.80;
-        const barGap    = barFs * GAP_RATIO;
-        const { cl: codeLines, cH: codeBlockH, totalH } = layout;
-
-        // Vertically center — clamp so text never starts above the bar top
-        const barInnerTop = y + 2 + BAR_PAD_Y;
-        const blockTopY   = Math.max(barInnerTop, y + 2 + (bh - totalH) / 2);
-
-        // Draw course code (bold)
+        // Determine what fits: try code+room+time, fallback to code+room, fallback to code only
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(barFs);
+        pdf.setFontSize(globalBarFs);
+        const codeLines  = splitWithHyphenation(pdf, codePart, maxTextW);
+        const codeLineH  = globalBarFs * 1.1;
+        const codeBlockH = codeLines.length * codeLineH;
+
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(globalRoomFs);
+        const roomFits = pdf.getTextWidth(roomPart) <= maxTextW;
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(globalTimeFs);
+        const timeFits = pdf.getTextWidth(timePart) <= maxTextW;
+
+        const gapPt   = globalBarFs * GAP_RATIO;
+        const roomLineH = globalRoomFs * 1.1;
+        const timeLineH = globalTimeFs * 1.1;
+
+        // Calculate total height needed for all three lines
+        let totalH_3 = codeBlockH + gapPt + roomLineH + gapPt * 0.6 + timeLineH;
+        let totalH_2 = codeBlockH + gapPt + roomLineH;
+        let totalH_1 = codeBlockH;
+
+        // Decide layout: show time only if it fits vertically and text fits horizontally
+        const showTime = timeFits && roomFits && (totalH_3 <= maxTextH);
+        const showRoom = roomFits && (showTime ? true : totalH_2 <= maxTextH);
+
+        // Pick the right total height for centering
+        const usedH = showTime ? totalH_3 : (showRoom ? totalH_2 : totalH_1);
+        const blockTopY  = y + 2 + Math.max(0, (bh - usedH) / 2);
+        const codeStartY = blockTopY + globalBarFs * 0.82;
+
+        // Draw course code
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(globalBarFs);
         if (isAsync) pdf.setTextColor(r, g, b);
         else         pdf.setTextColor(255, 255, 255);
-        const codeStartY = blockTopY + barFs * 0.82;
         codeLines.forEach((line, li) => {
-          pdf.text(line, bx + BAR_PAD_X, codeStartY + li * (barFs * 1.1));
+          pdf.text(line, bx + BAR_PAD_X, codeStartY + li * codeLineH);
         });
 
-        // Draw room (italic)
-        if (includeRoom) {
-          const roomBaseY = blockTopY + codeBlockH + barGap + barRoomFs * 0.82;
+        if (showRoom) {
+          // Draw room
+          const roomBaseY = blockTopY + codeBlockH + gapPt + globalRoomFs * 0.82;
           pdf.setFont('helvetica', 'italic');
-          pdf.setFontSize(barRoomFs);
+          pdf.setFontSize(globalRoomFs);
           if (isAsync) {
             pdf.setTextColor(Math.min(255, r + 40), Math.min(255, g + 40), Math.min(255, b + 40));
           } else {
@@ -893,11 +826,11 @@
           }
           pdf.text(roomPart, bx + BAR_PAD_X, roomBaseY);
 
-          // Draw time range (normal)
-          if (includeTime) {
-            const timeBaseY = blockTopY + codeBlockH + barGap + barRoomFs * 1.1 + barGap * 0.6 + barTimeFs * 0.82;
+          if (showTime) {
+            // Draw time range
+            const timeBaseY = blockTopY + codeBlockH + gapPt + roomLineH + gapPt * 0.6 + globalTimeFs * 0.82;
             pdf.setFont('helvetica', 'normal');
-            pdf.setFontSize(barTimeFs);
+            pdf.setFontSize(globalTimeFs);
             if (isAsync) {
               pdf.setTextColor(Math.min(255, r + 60), Math.min(255, g + 60), Math.min(255, b + 60));
             } else {
@@ -907,122 +840,6 @@
           }
         }
       });
-    });
-
-    // ── FREE-SLOT OVERLAY ────────────────────────────────────────────
-    // Compute occupied minutes across ALL members (not just this page chunk)
-    // so multi-page PDFs don't falsely show free slots for absent members.
-    // Resolution: track per-minute occupancy for accurate partial-slot detection.
-    const totalMins = END_MIN - START_MIN; // 875 minutes (7 AM – 9:30 PM)
-    const occupiedMin = new Uint8Array(totalMins);
-    allMembers.forEach(member => {
-      member.classes.filter(e => e.day === day).forEach(entry => {
-        const s = Math.max(0, entry.start - START_MIN);
-        const e2 = Math.min(totalMins, entry.end - START_MIN);
-        for (let m = s; m < e2; m++) occupiedMin[m] = 1;
-      });
-    });
-
-    // Merge contiguous free runs (in minutes), discard runs <= 10 minutes
-    const MIN_FREE_MINS = 10; // must be MORE than 10 min to show as free
-    const freeRuns = [];
-    let runStart = -1;
-    for (let m = 0; m <= totalMins; m++) {
-      const isFree = m < totalMins && !occupiedMin[m];
-      if (isFree && runStart === -1) { runStart = m; }
-      else if (!isFree && runStart !== -1) {
-        if (m - runStart > MIN_FREE_MINS) freeRuns.push([runStart, m]);
-        runStart = -1;
-      }
-    }
-
-    // Draw free-slot overlays (behind row dividers, above bg)
-    const gridH = actualGridBottom - gridTop;
-    freeRuns.forEach(([sMin, eMin]) => {
-      const fx = timelineX + (sMin / totalMins) * timelineW;
-      const fw = ((eMin - sMin) / totalMins) * timelineW;
-
-      // Light green fill spanning full grid height
-      pdf.setFillColor(220, 245, 220);
-      pdf.rect(fx, gridTop, fw, gridH, 'F');
-
-      // Vertical centred label: "Free" on line 1, time range on line 2
-      // Text is rotated 90° and centred vertically in the band.
-      // Only draw if the band is wide enough to be legible at all.
-      const startM  = START_MIN + sMin;
-      const endM    = START_MIN + eMin;
-      const line1   = 'Free';
-      const line2   = `${fmtFull(startM)}–${fmtFull(endM)}`;
-
-      // Pick a font size that fits within the band width when rotated
-      // (rotated text height = text width; rotated text width = text height)
-      // We want the combined "height" of both lines (which becomes width when rotated)
-      // to fit within fw - 4pt padding.
-      const MAX_LABEL_FS = 8;
-      const MIN_LABEL_FS = 4;
-      let labelFs = MAX_LABEL_FS;
-      let line1W, line2W;
-      for (; labelFs >= MIN_LABEL_FS; labelFs -= 0.5) {
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(labelFs);
-        line1W = pdf.getTextWidth(line1);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(labelFs * 0.88);
-        line2W = pdf.getTextWidth(line2);
-        // When rotated, "width" of text becomes the vertical space it needs.
-        // Both lines sit side-by-side rotated; total rotated height = line1W + gap + line2W
-        // But we need that <= fw - 4.
-        const rotatedSpan = line1W + labelFs * 1.2 + line2W; // combined horizontal span after rotation
-        if (rotatedSpan <= fw - 4) break;
-      }
-      if (labelFs < MIN_LABEL_FS) labelFs = MIN_LABEL_FS;
-
-      // Re-measure at chosen size
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(labelFs);
-      line1W = pdf.getTextWidth(line1);
-      const line2Fs = labelFs * 0.88;
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(line2Fs);
-      line2W = pdf.getTextWidth(line2);
-
-      // Vertical centre of the grid band
-      const bandCenterY = gridTop + gridH / 2;
-      // Horizontal centre of the free band (= vertical anchor when rotated)
-      const bandCenterX = fx + fw / 2;
-
-      // Total height of both text lines when rendered horizontally
-      // (= total width occupied when rotated 90°)
-      const lineGap    = labelFs * 0.3;
-      const totalSpan  = line1W + lineGap + line2W;
-
-      // Draw line1 ("Free") rotated 90° counter-clockwise, centred in the band
-      // jsPDF angle is counter-clockwise. anchor: baseline of text.
-      // When rotated +90, text reads bottom-to-top.
-      // Position: x = bandCenterX, y = bandCenterY + half of totalSpan
-      const line1StartY = bandCenterY + totalSpan / 2;
-      const line2StartY = line1StartY - line1W - lineGap;
-
-      // Only draw if both lines fit vertically in the grid
-      if (totalSpan <= gridH - 4 && fw >= 6) {
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(labelFs);
-        pdf.setTextColor(80, 160, 80);
-        pdf.text(line1, bandCenterX, line1StartY, { angle: 90 });
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(line2Fs);
-        pdf.setTextColor(100, 170, 100);
-        pdf.text(line2, bandCenterX, line2StartY, { angle: 90 });
-      }
-    });
-
-    // Redraw row dividers on top of the free overlay so they stay crisp
-    members.forEach((member, idx) => {
-      const y = gridTop + idx * rowH;
-      pdf.setDrawColor(220,220,220);
-      pdf.setLineWidth(0.2);
-      pdf.line(timelineX, y + rowH, PW - margin, y + rowH);
     });
 
     pdf.setDrawColor(180,180,180);
@@ -1097,28 +914,19 @@
     const rowH          = Math.max(14, rowsHEst / rowCount);
     const bh            = Math.max(rowH - 4, 4);
 
-    const nameFontSz = Math.min(14, Math.max(8, rowH * 0.45));
-    pdf.setFont('helvetica','bold');
-    pdf.setFontSize(nameFontSz);
-    let longestNameW = 0;
-    members.forEach(m => {
-      const label = m.dept ? `${m.fullName} (${m.dept})` : m.fullName;
-      longestNameW = Math.max(longestNameW, pdf.getTextWidth(label));
-    });
-    const nameColW  = Math.min(Math.max(longestNameW + 16, 80), 260);
+    // Must match drawDayPage: fixed name column width
+    const nameColW  = 120;
     const timelineX = margin + nameColW;
     const timelineW = PW - margin - timelineX;
 
-    const MAX_FS = Math.min(14, Math.max(5, bh * 0.40));
+    const MAX_FS = Math.min(16, Math.max(6, bh * 0.46));
     let globalFs = MAX_FS;
 
     members.forEach(member => {
       daysToCheck.forEach(day => {
         member.classes.filter(e => e.day === day).forEach(entry => {
-          // Use display-clamped width
           const dispStart = Math.max(entry.start, START_MIN);
           const dispEnd   = Math.min(entry.end, END_MIN);
-          if (dispEnd <= dispStart) return;
           const bw       = ((dispEnd - dispStart) / (END_MIN - START_MIN)) * timelineW;
           const maxTextW = bw - BAR_PAD_X * 2;
           const maxTextH = bh - BAR_PAD_Y * 2;
@@ -1128,34 +936,29 @@
           const roomPart = `(${entry.room})`;
           const timePart = `${fmtFull(entry.start)}–${fmtFull(entry.end)}`;
 
-          // Mirror per-bar degradation: code+room+time, then code+room, then code-only.
-          let bestFs = MIN_BAR_FS;
-          outerLoop: for (const [tryRoom, tryTime] of [[true,true],[true,false],[false,false]]) {
-            for (let fs = globalFs; fs >= MIN_BAR_FS; fs -= 0.5) {
-              const rFs = fs * 0.88;
-              const tFs = fs * 0.80;
-              const gap = fs * GAP_RATIO;
-              pdf.setFont('helvetica', 'bold');
-              pdf.setFontSize(fs);
-              const cl = splitWithHyphenation(pdf, codePart, maxTextW);
-              const cH = cl.length * (fs * 1.1);
-              let totalH = cH;
-              if (tryRoom) {
-                pdf.setFont('helvetica','italic');
-                pdf.setFontSize(rFs);
-                if (pdf.getTextWidth(roomPart) > maxTextW) continue;
-                totalH += gap + rFs * 1.1;
-              }
-              if (tryTime) {
-                pdf.setFont('helvetica','normal');
-                pdf.setFontSize(tFs);
-                if (pdf.getTextWidth(timePart) > maxTextW) continue;
-                totalH += gap * 0.6 + tFs * 1.1;
-              }
-              if (totalH <= maxTextH) { bestFs = fs; break outerLoop; }
-            }
+          let fs = globalFs;
+          while (fs >= MIN_BAR_FS) {
+            const roomFs = fs * 0.88;
+            const timeFs = fs * 0.78;
+
+            pdf.setFont('helvetica','italic');
+            pdf.setFontSize(roomFs);
+            if (pdf.getTextWidth(roomPart) > maxTextW) { fs -= 0.5; continue; }
+
+            pdf.setFont('helvetica','bold');
+            pdf.setFontSize(fs);
+            const codeLines  = splitWithHyphenation(pdf, codePart, maxTextW);
+            const codeBlockH = codeLines.length * (fs * 1.1);
+            const gapPt      = fs * GAP_RATIO;
+            const roomLineH  = roomFs * 1.1;
+            const timeLineH  = timeFs * 1.1;
+
+            // Check if code+room fits; time is optional (gracefully hidden if not)
+            const totalH_2 = codeBlockH + gapPt + roomLineH;
+            if (totalH_2 <= maxTextH) break;
+            fs -= 0.5;
           }
-          globalFs = Math.min(globalFs, bestFs);
+          globalFs = Math.min(globalFs, Math.max(fs, MIN_BAR_FS));
         });
       });
     });
@@ -1213,7 +1016,7 @@
     const tpl   = document.getElementById('class-template');
     const entry = tpl.content.firstElementChild.cloneNode(true);
     fillDaySelect(entry.querySelector('.day'));
-    entry.querySelector('.start-time').value = '07:00';
+    entry.querySelector('.start-time').value = '06:00';
     entry.querySelector('.end-time').value   = '09:00';
     entry.querySelector('.sync-mode').value  = 'sync';
     const wrap = document.createElement('div');
